@@ -1,0 +1,25 @@
+{
+  "name": "CC 工具箱 · JSON 解析",
+  "description": "在 DBX 工作台里直接解析 JSON：键值/表格视图、嵌套展开与条数统计、格式化、压缩、校验、高级筛选、CSV 导出，淡绿阅读配色。",
+  "icon": "assets/plugin.svg",
+  "tags": [
+    "json",
+    "grid",
+    "formatter",
+    "workbench"
+  ],
+  "permissions": [
+    "host.storage"
+  ],
+  "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox",
+  "homepage": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox",
+  "license": "Apache-2.0",
+  "releaseNotes": "首个版本：JSON 文本 + 表格视图、嵌套展开、高级筛选、CSV 导出、淡绿/深色主题。",
+  "localizations": {
+    "zh-CN": {
+      "name": "CC 工具箱 · JSON 解析",
+      "description": "在 DBX 工作台里直接解析 JSON：键值/表格视图、嵌套展开与条数统计、格式化、压缩、校验、高级筛选、CSV 导出。"
+    }
+  }
+}
+

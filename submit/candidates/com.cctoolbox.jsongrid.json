@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "com.cctoolbox.jsongrid",
+  "publisher": "cctoolbox",
+  "version": "0.1.0",
+  "name": "CC 工具箱 · JSON 解析",
+  "description": "在 DBX 工作台里直接解析 JSON：键值/表格视图、嵌套展开与条数统计、格式化、压缩、校验、高级筛选、CSV 导出，淡绿阅读配色。",
+  "icon": "https://raw.githubusercontent.com/fangmingzhao69-glitch/dbx-cc-toolbox/v0.1.0/assets/plugin.svg",
+  "tags": [
+    "json",
+    "grid",
+    "formatter",
+    "workbench"
+  ],
+  "permissions": [
+    "host.storage"
+  ],
+  "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.1.0",
+  "homepage": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox",
+  "license": "Apache-2.0",
+  "releaseNotes": "首个版本：JSON 文本 + 表格视图、嵌套展开、高级筛选、CSV 导出、淡绿/深色主题。",
+  "localizations": {
+    "zh-CN": {
+      "name": "CC 工具箱 · JSON 解析",
+      "description": "在 DBX 工作台里直接解析 JSON：键值/表格视图、嵌套展开与条数统计、格式化、压缩、校验、高级筛选、CSV 导出。"
+    }
+  },
+  "targets": [
+    {
+      "target": "universal",
+      "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/v0.1.0/com.cctoolbox.jsongrid-0.1.0-universal.dbxp",
+      "sha256": "aa1bccc4b0857bc10ebba9d861611d1564506836238191bba4acb6d49ab9c3e7",
+      "size": 41129
+    }
+  ]
+}
+

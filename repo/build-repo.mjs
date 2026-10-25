@@ -12,12 +12,18 @@ const pluginRoot = path.resolve(here, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'manifest.json'), 'utf8'));
 const pluginId = manifest.id;
 const version = manifest.version;
-const unsignedPath = path.join(pluginRoot, 'dist', pluginId + '-' + version + '-universal.dbxp');
+const hasBackend = Boolean(manifest.entrypoints && manifest.entrypoints.backend);
+const target = hasBackend ? 'windows-x64' : 'universal';
+const releaseBaseIndex = process.argv.indexOf('--release-url-base');
+const releaseBase = releaseBaseIndex >= 0 ? process.argv[releaseBaseIndex + 1].replace(/\/$/, '') : '';
+const unsignedPath = path.join(pluginRoot, 'dist', pluginId + '-' + version + '-' + target + '.dbxp');
 
 const portIndex = process.argv.indexOf('--port');
 const port = portIndex >= 0 ? Number(process.argv[portIndex + 1]) : Number(process.env.CC_REPO_PORT || 5210);
-const host = '127.0.0.1';
-const baseUrl = 'http://' + host + ':' + port;
+const baseUrlIndex = process.argv.indexOf('--base-url');
+const baseUrl = baseUrlIndex >= 0
+  ? process.argv[baseUrlIndex + 1].replace(/\/$/, '')
+  : (process.env.CC_REPO_BASE_URL ? process.env.CC_REPO_BASE_URL.replace(/\/$/, '') : 'http://127.0.0.1:' + port);
 
 const KEY_ID = 'cctoolbox-local-2026';
 const keyDir = path.join(here, 'keys');
@@ -46,14 +52,33 @@ const publicKey = crypto.createPublicKey({ key: Buffer.from(keys.publicKeyBase64
   ? Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(keys.publicKeyBase64, 'base64')])
   : Buffer.from(keys.publicKeyBase64, 'base64'), format: 'der', type: 'spki' });
 
-// 1. 读取未签名包中的文件（去掉旧 checksums/signature）
-const unsigned = new AdmZip(unsignedPath);
+// 1. 收集要打包的文件：原生插件直接读源码目录（manifest/assets/ui/bin），纯前端读未签名 dbxp
 const files = new Map();
-for (const entry of unsigned.getEntries()) {
-  if (entry.isDirectory) continue;
-  const name = entry.entryName.replace(/\\/g, '/');
-  if (name === 'checksums.json' || name === 'signature.json') continue;
-  files.set(name, entry.getData());
+const collectDirectory = (relative) => {
+  const full = path.join(pluginRoot, relative);
+  if (!fs.existsSync(full)) return;
+  const stat = fs.statSync(full);
+  if (stat.isFile()) { files.set(relative, fs.readFileSync(full)); return; }
+  for (const entry of fs.readdirSync(full, { withFileTypes: true })) {
+    const child = relative + '/' + entry.name;
+    if (entry.isDirectory()) collectDirectory(child);
+    else if (entry.isFile()) files.set(child, fs.readFileSync(path.join(pluginRoot, child)));
+  }
+};
+if (hasBackend) {
+  collectDirectory('manifest.json');
+  collectDirectory('assets');
+  collectDirectory('ui');
+  collectDirectory('bin');
+  if (!files.size) throw new Error('没有收集到插件文件');
+} else {
+  const unsigned = new AdmZip(unsignedPath);
+  for (const entry of unsigned.getEntries()) {
+    if (entry.isDirectory) continue;
+    const name = entry.entryName.replace(/\\/g, '/');
+    if (name === 'checksums.json' || name === 'signature.json') continue;
+    files.set(name, entry.getData());
+  }
 }
 
 // 2. 计算 checksums.json 并签名
@@ -73,7 +98,7 @@ for (const name of sortedNames) signedZip.addFile(name, files.get(name));
 signedZip.addFile('checksums.json', checksumsBytes);
 signedZip.addFile('signature.json', signatureBytes);
 
-const fileName = pluginId + '-' + version + '-universal.signed.dbxp';
+const fileName = pluginId + '-' + version + '-' + target + '.signed.dbxp';
 const outDir = path.join(here, 'dist', 'plugins', pluginId, version);
 fs.mkdirSync(outDir, { recursive: true });
 const signedPath = path.join(outDir, fileName);
@@ -120,8 +145,8 @@ const catalog = {
           releaseNotes: '首个版本：JSON 文本 + 表格视图、嵌套展开、高级筛选、CSV 导出、淡绿/深色主题。',
           artifacts: [
             {
-              target: 'universal',
-              url: baseUrl + '/plugins/' + pluginId + '/' + version + '/' + fileName,
+              target,
+              url: releaseBase ? releaseBase + '/' + fileName : baseUrl + '/plugins/' + pluginId + '/' + version + '/' + fileName,
               sha256,
               signingKeyId: keys.keyId,
               size,

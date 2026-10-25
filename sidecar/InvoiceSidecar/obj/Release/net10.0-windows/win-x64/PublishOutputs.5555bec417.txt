@@ -1,0 +1,2 @@
+E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\dist\cc-invoice-sidecar.pdb
+E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\dist\cc-invoice-sidecar.exe

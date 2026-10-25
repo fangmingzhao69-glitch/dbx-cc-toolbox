@@ -5,3 +5,7 @@ repo/dist/
 *.log
 .DS_Store
 Thumbs.db
+bin/
+sidecar/dist/
+sidecar/dist-nowf/
+sidecar/dist-trim/

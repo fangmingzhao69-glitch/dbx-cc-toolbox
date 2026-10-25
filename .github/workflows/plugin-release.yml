@@ -16,6 +16,4 @@ jobs:
       package-path: dist/*.dbxp
       metadata-path: dist/*.artifact.json
       plugin-cli-version: 0.1.9
-      go-version: ""
-      rust-toolchain: ""
       build-matrix: '{"include":[{"runner":"ubuntu-24.04","target":"universal"}]}'

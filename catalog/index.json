@@ -1,0 +1,52 @@
+{
+  "$schema": "https://dbx.local/schemas/plugin-marketplace-v1.json",
+  "catalogVersion": 1,
+  "repository": {
+    "id": "cctoolbox.local",
+    "name": "CC 工具箱自托管仓库",
+    "homepage": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/catalog/index.json"
+  },
+  "generatedAt": "2026-10-25T09:35:03.215Z",
+  "plugins": [
+    {
+      "id": "com.cctoolbox.jsongrid",
+      "name": "CC 工具箱 · JSON 解析",
+      "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
+      "publisher": "cctoolbox",
+      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.1/plugin.svg",
+      "tags": [
+        "json",
+        "grid",
+        "workbench",
+        "cctoolbox"
+      ],
+      "permissions": [
+        "host.storage"
+      ],
+      "source": "https://github.com/chenmo02/xx",
+      "latestVersion": "0.2.1",
+      "versions": [
+        {
+          "version": "0.2.1",
+          "releasedAt": "2026-10-25T09:35:03.215Z",
+          "releaseNotes": "首个版本：JSON 文本 + 表格视图、嵌套展开、高级筛选、CSV 导出、淡绿/深色主题。",
+          "artifacts": [
+            {
+              "target": "windows-x64",
+              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.1/com.cctoolbox.jsongrid-0.2.1-windows-x64.signed.dbxp",
+              "sha256": "cff5ec250763b5d2bf7f204e3a07512870ba77ac42daf42abb15d2926832cdab",
+              "signingKeyId": "cctoolbox-local-2026",
+              "size": 36476514
+            }
+          ]
+        }
+      ],
+      "localizations": {
+        "zh-CN": {
+          "name": "CC 工具箱 · JSON 解析",
+          "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。"
+        }
+      }
+    }
+  ]
+}

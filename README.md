@@ -35,17 +35,20 @@ dbx-plugin package .
 
 ## 安装到 DBX
 
-推荐用自托管仓库安装（已签名，无需打开"允许未签名开发包"）：
+插件仓库已托管到 GitHub Pages（无需本地服务）：
 
-1. 双击 `repo\start-repo.cmd` 启动本地仓库（http://127.0.0.1:5210/catalog/index.json）
-2. DBX → 插件中心 → 设置 → 插件仓库：仓库 ID `cctoolbox.local`、名称 `CC 工具箱自托管仓库`、Catalog URL `http://127.0.0.1:5210/catalog/index.json` → 添加仓库
-3. 同一页「仓库信任设置」：Key ID `cctoolbox-local-2026`、Public Key `/c3/+1FI+BT/jfMp05ZFxjoYuCRbhFKAiv+0d7Br4Qo=` → 保存
-4. 刷新插件商店，搜索「CC 工具箱」→ 安装
-5. 顶部工具栏或命令面板打开「CC 工具箱 · JSON 解析」
+1. DBX → 插件中心 → 设置 → 插件仓库：
+   - 仓库 ID `cctoolbox.local`
+   - 名称 `CC 工具箱自托管仓库`
+   - Catalog URL `https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/catalog/index.json`
+   - 添加仓库
+2. 同页「仓库信任设置」：Key ID `cctoolbox-local-2026`，Public Key `/c3/+1FI+BT/jfMp05ZFxjoYuCRbhFKAiv+0d7Br4Qo=` → 保存
+3. 刷新插件商店，搜索「CC 工具箱」→ 安装
+4. 顶部工具栏/命令面板打开「CC 工具箱 · JSON 解析」
 
 详见 [repo/README.md](repo/README.md)。
 
-> 备用方式：插件中心 → 设置 → 勾选「允许安装未签名开发包」→ 已安装 → 从文件安装 → 选择 `dist\com.cctoolbox.json-0.1.0-universal.dbxp`。
+> 备用：本地服务 `repo\start-repo.cmd`，或插件中心 → 设置 → 勾选「允许安装未签名开发包」后从文件安装 `dist\*.dbxp`。
 
 ## 目录结构
 

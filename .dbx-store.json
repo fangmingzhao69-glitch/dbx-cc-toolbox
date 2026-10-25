@@ -1,25 +1,28 @@
 {
-  "name": "CC 工具箱 · JSON 解析",
-  "description": "在 DBX 工作台里直接解析 JSON：键值/表格视图、嵌套展开与条数统计、格式化、压缩、校验、高级筛选、CSV 导出，淡绿阅读配色。",
+  "name": "CC 工具箱",
+  "description": "DBX 工作台里的综合工具箱：JSON 解析/比对、CSV 预览与比对、临时建表、数据验证、在线绘图、发票 PDF/图片批量打印（原生侧车）。",
   "icon": "assets/plugin.svg",
   "tags": [
     "json",
     "grid",
-    "formatter",
+    "csv",
+    "toolbox",
+    "invoice",
     "workbench"
   ],
   "permissions": [
-    "host.storage"
+    "host.storage",
+    "host.connections:read",
+    "host.data:read"
   ],
   "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox",
   "homepage": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox",
   "license": "Apache-2.0",
-  "releaseNotes": "首个版本：JSON 文本 + 表格视图、嵌套展开、高级筛选、CSV 导出、淡绿/深色主题。",
+  "releaseNotes": "0.2.1：发票打印原生侧车（Windows），支持 PDF/图片发票、1/2/4 版式、套打偏移、打印机选择与预览。",
   "localizations": {
     "zh-CN": {
-      "name": "CC 工具箱 · JSON 解析",
-      "description": "在 DBX 工作台里直接解析 JSON：键值/表格视图、嵌套展开与条数统计、格式化、压缩、校验、高级筛选、CSV 导出。"
+      "name": "CC 工具箱",
+      "description": "DBX 工作台里的综合工具箱：JSON 解析/比对、CSV 预览与比对、临时建表、数据验证、在线绘图、发票批量打印。"
     }
   }
 }
-

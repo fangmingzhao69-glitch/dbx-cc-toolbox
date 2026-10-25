@@ -13,7 +13,9 @@
    - Key ID：`cctoolbox-local-2026`
    - Public Key：`/c3/+1FI+BT/jfMp05ZFxjoYuCRbhFKAiv+0d7Br4Qo=`
 4. 刷新插件商店 → 搜索「CC 工具箱」→ **安装**
-5. 顶部工具栏插件按钮，或命令面板搜索「CC 工具箱 · JSON 解析」打开
+5. 顶部工具栏插件按钮，或命令面板搜索「CC 工具箱」打开
+
+> 0.2.1 起为 **Windows x64** 版本（含发票打印原生侧车），其他系统无法安装。安装包约 36 MB。
 
 ## 注意事项
 

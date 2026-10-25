@@ -2,7 +2,7 @@
   "manifest_version": 1,
   "id": "com.cctoolbox.jsongrid",
   "name": "CC 工具箱 · JSON 解析",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "publisher": "cctoolbox",
   "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
   "icon": "assets/plugin.svg",

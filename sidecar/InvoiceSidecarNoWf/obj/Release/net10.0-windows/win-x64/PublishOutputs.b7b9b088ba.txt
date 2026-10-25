@@ -1,2 +1,4 @@
 E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\bin\win-x64\cc-invoice-sidecar.pdb
+E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\bin\win-x64\LICENSE
+E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\bin\win-x64\pdfium.dll
 E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\bin\win-x64\cc-invoice-sidecar.exe

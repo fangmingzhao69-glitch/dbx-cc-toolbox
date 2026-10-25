@@ -1,5 +1,9 @@
 using System.Drawing;
 using System.Drawing.Printing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using Docnet.Core;
+using Docnet.Core.Models;
 using System.Reflection;
 using System.Text.Json;
 
@@ -71,23 +75,9 @@ static object ListPrinters()
 
 static object Print(JsonElement parameters)
 {
-    var images = new List<Image>();
+    var images = LoadImages(parameters);
     try
     {
-        if (parameters.ValueKind == JsonValueKind.Object && parameters.TryGetProperty("images", out var imageArray))
-        {
-            foreach (var imageElement in imageArray.EnumerateArray())
-            {
-                var value = imageElement.GetString();
-                if (string.IsNullOrWhiteSpace(value)) continue;
-                var data = value.Contains(',') && value.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                    ? value[(value.IndexOf(',') + 1)..]
-                    : value;
-                var bytes = Convert.FromBase64String(data);
-                using var stream = new MemoryStream(bytes);
-                images.Add(Image.FromStream(stream));
-            }
-        }
         if (images.Count == 0) throw new InvalidOperationException("没有可打印的图片数据");
 
         int layout = 1;
@@ -170,22 +160,9 @@ static object Print(JsonElement parameters)
 }
 static object Preview(JsonElement parameters)
 {
-    var images = new List<Image>();
+    var images = LoadImages(parameters);
     try
     {
-        if (parameters.ValueKind == JsonValueKind.Object && parameters.TryGetProperty("images", out var imageArray))
-        {
-            foreach (var imageElement in imageArray.EnumerateArray())
-            {
-                var value = imageElement.GetString();
-                if (string.IsNullOrWhiteSpace(value)) continue;
-                var data = value.Contains(',') && value.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                    ? value[(value.IndexOf(',') + 1)..]
-                    : value;
-                using var stream = new MemoryStream(Convert.FromBase64String(data));
-                images.Add(Image.FromStream(stream));
-            }
-        }
         if (images.Count == 0) throw new InvalidOperationException("没有可预览的图片数据");
         int layout = 1;
         if (parameters.TryGetProperty("layout", out var layoutElement) && layoutElement.TryGetInt32(out var layoutValue))
@@ -248,6 +225,58 @@ static object Preview(JsonElement parameters)
     {
         foreach (var image in images) image.Dispose();
     }
+}
+
+static List<Image> LoadImages(JsonElement parameters)
+{
+    var images = new List<Image>();
+    if (parameters.ValueKind != JsonValueKind.Object || !parameters.TryGetProperty("images", out var imageArray)) return images;
+    foreach (var imageElement in imageArray.EnumerateArray())
+    {
+        var value = imageElement.GetString();
+        if (string.IsNullOrWhiteSpace(value)) continue;
+        var mime = "";
+        var base64 = value;
+        if (value.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var comma = value.IndexOf(',');
+            var header = value[5..(comma < 0 ? value.Length : comma)];
+            mime = header.Split(';')[0];
+            if (comma < 0) continue;
+            base64 = value[(comma + 1)..];
+        }
+        var bytes = Convert.FromBase64String(base64);
+        var isPdf = mime.Contains("pdf", StringComparison.OrdinalIgnoreCase) ||
+                    (bytes.Length > 3 && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F');
+        if (isPdf) images.AddRange(RenderPdf(bytes));
+        else
+        {
+            using var stream = new MemoryStream(bytes);
+            images.Add(Image.FromStream(stream));
+        }
+    }
+    return images;
+}
+
+static List<Image> RenderPdf(byte[] pdfBytes)
+{
+    var result = new List<Image>();
+    using var library = DocLib.Instance;
+    using var document = library.GetDocReader(pdfBytes, new PageDimensions(1240, 1754));
+    var pageCount = document.GetPageCount();
+    for (var index = 0; index < pageCount; index++)
+    {
+        using var page = document.GetPageReader(index);
+        var width = page.GetPageWidth();
+        var height = page.GetPageHeight();
+        var raw = page.GetImage();
+        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        var data = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+        Marshal.Copy(raw, 0, data.Scan0, raw.Length);
+        bitmap.UnlockBits(data);
+        result.Add(bitmap);
+    }
+    return result;
 }
 
 sealed class BitmapPrintController : PrintController

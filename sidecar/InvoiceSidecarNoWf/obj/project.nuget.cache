@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "sq2kFx7LVMw=",
+  "dgSpecHash": "OM1h6g2NGa8=",
   "success": true,
   "projectFilePath": "E:\\cxgj\\AIgonzhuoqu\\XMWJ\\dbx-cc-toolbox\\sidecar\\InvoiceSidecarNoWf\\InvoiceSidecarNoWf.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\23584\\.nuget\\packages\\docnet.core\\2.6.0\\docnet.core.2.6.0.nupkg.sha512",
     "C:\\Users\\23584\\.nuget\\packages\\microsoft.net.illink.tasks\\10.0.11\\microsoft.net.illink.tasks.10.0.11.nupkg.sha512",
     "C:\\Users\\23584\\.nuget\\packages\\microsoft.win32.systemevents\\9.0.0\\microsoft.win32.systemevents.9.0.0.nupkg.sha512",
     "C:\\Users\\23584\\.nuget\\packages\\system.drawing.common\\9.0.0\\system.drawing.common.9.0.0.nupkg.sha512",

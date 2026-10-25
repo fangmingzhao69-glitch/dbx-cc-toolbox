@@ -12,11 +12,11 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("cc-invoice-sidecar")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("0.2.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.0+a34d21295c10a38be5ce81c606f80c6644a0fd32")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("0.2.1.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.1+808a62f737bd74e09748099bb1632111d1a328c4")]
 [assembly: System.Reflection.AssemblyProductAttribute("cc-invoice-sidecar")]
 [assembly: System.Reflection.AssemblyTitleAttribute("cc-invoice-sidecar")]
-[assembly: System.Reflection.AssemblyVersionAttribute("0.2.0.0")]
+[assembly: System.Reflection.AssemblyVersionAttribute("0.2.1.0")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 

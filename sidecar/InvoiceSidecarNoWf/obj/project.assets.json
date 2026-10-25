@@ -2,6 +2,77 @@
   "version": 4,
   "targets": {
     "net10.0-windows": {
+      "Docnet.Core/2.6.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/Docnet.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Docnet.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/linux-arm/native/LICENSE": {
+            "assetType": "native",
+            "rid": "linux-arm"
+          },
+          "runtimes/linux-arm/native/pdfium.so": {
+            "assetType": "native",
+            "rid": "linux-arm"
+          },
+          "runtimes/linux-arm64/native/LICENSE": {
+            "assetType": "native",
+            "rid": "linux-arm64"
+          },
+          "runtimes/linux-arm64/native/pdfium.so": {
+            "assetType": "native",
+            "rid": "linux-arm64"
+          },
+          "runtimes/linux/native/LICENSE": {
+            "assetType": "native",
+            "rid": "linux"
+          },
+          "runtimes/linux/native/pdfium.so": {
+            "assetType": "native",
+            "rid": "linux"
+          },
+          "runtimes/osx-arm64/native/LICENSE": {
+            "assetType": "native",
+            "rid": "osx-arm64"
+          },
+          "runtimes/osx-arm64/native/pdfium.dylib": {
+            "assetType": "native",
+            "rid": "osx-arm64"
+          },
+          "runtimes/osx-x64/native/LICENSE": {
+            "assetType": "native",
+            "rid": "osx-x64"
+          },
+          "runtimes/osx-x64/native/pdfium.dylib": {
+            "assetType": "native",
+            "rid": "osx-x64"
+          },
+          "runtimes/win-x64/native/LICENSE": {
+            "assetType": "native",
+            "rid": "win-x64"
+          },
+          "runtimes/win-x64/native/pdfium.dll": {
+            "assetType": "native",
+            "rid": "win-x64"
+          },
+          "runtimes/win-x86/native/LICENSE": {
+            "assetType": "native",
+            "rid": "win-x86"
+          },
+          "runtimes/win-x86/native/pdfium.dll": {
+            "assetType": "native",
+            "rid": "win-x86"
+          }
+        }
+      },
       "Microsoft.NET.ILLink.Tasks/10.0.11": {
         "type": "package",
         "build": {
@@ -57,6 +128,23 @@
       }
     },
     "net10.0-windows/win-x64": {
+      "Docnet.Core/2.6.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/Docnet.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Docnet.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "native": {
+          "runtimes/win-x64/native/LICENSE": {},
+          "runtimes/win-x64/native/pdfium.dll": {}
+        }
+      },
       "Microsoft.NET.ILLink.Tasks/10.0.11": {
         "type": "package",
         "build": {
@@ -107,6 +195,35 @@
     }
   },
   "libraries": {
+    "Docnet.Core/2.6.0": {
+      "sha512": "in7fpB16Zbdz7D7Qv+4QrapTKKOU1ub2XOvmVGVDEyEwnEZjlbGIiwmpfO03q/GDDEkDM/gIAumxK0U988qSsQ==",
+      "type": "package",
+      "path": "docnet.core/2.6.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "build/net45/Docnet.Core.targets",
+        "docnet.core.2.6.0.nupkg.sha512",
+        "docnet.core.nuspec",
+        "icon.png",
+        "lib/netstandard2.0/Docnet.Core.dll",
+        "lib/netstandard2.0/Docnet.Core.xml",
+        "runtimes/linux-arm/native/LICENSE",
+        "runtimes/linux-arm/native/pdfium.so",
+        "runtimes/linux-arm64/native/LICENSE",
+        "runtimes/linux-arm64/native/pdfium.so",
+        "runtimes/linux/native/LICENSE",
+        "runtimes/linux/native/pdfium.so",
+        "runtimes/osx-arm64/native/LICENSE",
+        "runtimes/osx-arm64/native/pdfium.dylib",
+        "runtimes/osx-x64/native/LICENSE",
+        "runtimes/osx-x64/native/pdfium.dylib",
+        "runtimes/win-x64/native/LICENSE",
+        "runtimes/win-x64/native/pdfium.dll",
+        "runtimes/win-x86/native/LICENSE",
+        "runtimes/win-x86/native/pdfium.dll"
+      ]
+    },
     "Microsoft.NET.ILLink.Tasks/10.0.11": {
       "sha512": "IBf7lbovvjGWVWXZX5cJ/cO0WXbId0Zq4BuSeT94mGZuOAP66oMeH9PTBZ9Jpp3Jb6jtK0qm/NyUbPRo1gC/wQ==",
       "type": "package",
@@ -234,6 +351,7 @@
   },
   "projectFileDependencyGroups": {
     "net10.0-windows": [
+      "Docnet.Core >= 2.6.0",
       "Microsoft.NET.ILLink.Tasks >= 10.0.11",
       "System.Drawing.Common >= 9.0.0"
     ]
@@ -243,7 +361,7 @@
     "E:\\cxgj\\VisualStudio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "0.2.0",
+    "version": "0.2.1",
     "restore": {
       "projectUniqueName": "E:\\cxgj\\AIgonzhuoqu\\XMWJ\\dbx-cc-toolbox\\sidecar\\InvoiceSidecarNoWf\\InvoiceSidecarNoWf.csproj",
       "projectName": "cc-invoice-sidecar",
@@ -290,6 +408,10 @@
         "framework": "net10.0-windows7.0",
         "targetAlias": "net10.0-windows",
         "dependencies": {
+          "Docnet.Core": {
+            "target": "Package",
+            "version": "[2.6.0, )"
+          },
           "Microsoft.NET.ILLink.Tasks": {
             "suppressParent": "All",
             "target": "Package",

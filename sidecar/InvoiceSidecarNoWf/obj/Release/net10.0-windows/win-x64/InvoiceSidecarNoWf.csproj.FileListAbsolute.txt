@@ -205,3 +205,6 @@ E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\InvoiceSidecarNoWf\obj\Release\n
 E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\InvoiceSidecarNoWf\obj\Release\net10.0-windows\win-x64\cc-invoice-sidecar.pdb
 E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\InvoiceSidecarNoWf\obj\Release\net10.0-windows\win-x64\InvoiceSidecarNoWf.genruntimeconfig.cache
 E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\InvoiceSidecarNoWf\obj\Release\net10.0-windows\win-x64\ref\cc-invoice-sidecar.dll
+E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\InvoiceSidecarNoWf\bin\Release\net10.0-windows\win-x64\Docnet.Core.dll
+E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\InvoiceSidecarNoWf\bin\Release\net10.0-windows\win-x64\LICENSE
+E:\cxgj\AIgonzhuoqu\XMWJ\dbx-cc-toolbox\sidecar\InvoiceSidecarNoWf\bin\Release\net10.0-windows\win-x64\pdfium.dll

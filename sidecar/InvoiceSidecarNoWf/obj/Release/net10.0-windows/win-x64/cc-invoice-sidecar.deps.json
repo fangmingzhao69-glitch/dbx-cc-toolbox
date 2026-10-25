@@ -7,8 +7,9 @@
   "targets": {
     ".NETCoreApp,Version=v10.0": {},
     ".NETCoreApp,Version=v10.0/win-x64": {
-      "cc-invoice-sidecar/0.2.0": {
+      "cc-invoice-sidecar/0.2.1": {
         "dependencies": {
+          "Docnet.Core": "2.6.0",
           "System.Drawing.Common": "9.0.0",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "10.0.11"
         },
@@ -708,6 +709,22 @@
           }
         }
       },
+      "Docnet.Core/2.6.0": {
+        "runtime": {
+          "lib/netstandard2.0/Docnet.Core.dll": {
+            "assemblyVersion": "2.6.0.0",
+            "fileVersion": "2.6.0.0"
+          }
+        },
+        "native": {
+          "runtimes/win-x64/native/LICENSE": {
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/pdfium.dll": {
+            "fileVersion": "110.0.5445.0"
+          }
+        }
+      },
       "Microsoft.Win32.SystemEvents/9.0.0": {
         "runtime": {
           "runtimes/win/lib/net9.0/Microsoft.Win32.SystemEvents.dll": {
@@ -734,7 +751,7 @@
     }
   },
   "libraries": {
-    "cc-invoice-sidecar/0.2.0": {
+    "cc-invoice-sidecar/0.2.1": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -743,6 +760,13 @@
       "type": "runtimepack",
       "serviceable": false,
       "sha512": ""
+    },
+    "Docnet.Core/2.6.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-in7fpB16Zbdz7D7Qv+4QrapTKKOU1ub2XOvmVGVDEyEwnEZjlbGIiwmpfO03q/GDDEkDM/gIAumxK0U988qSsQ==",
+      "path": "docnet.core/2.6.0",
+      "hashPath": "docnet.core.2.6.0.nupkg.sha512"
     },
     "Microsoft.Win32.SystemEvents/9.0.0": {
       "type": "package",

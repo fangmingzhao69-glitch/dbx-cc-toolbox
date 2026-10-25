@@ -5,7 +5,7 @@
   },
   "projects": {
     "E:\\cxgj\\AIgonzhuoqu\\XMWJ\\dbx-cc-toolbox\\sidecar\\InvoiceSidecarNoWf\\InvoiceSidecarNoWf.csproj": {
-      "version": "0.2.0",
+      "version": "0.2.1",
       "restore": {
         "projectUniqueName": "E:\\cxgj\\AIgonzhuoqu\\XMWJ\\dbx-cc-toolbox\\sidecar\\InvoiceSidecarNoWf\\InvoiceSidecarNoWf.csproj",
         "projectName": "cc-invoice-sidecar",
@@ -52,6 +52,10 @@
           "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "dependencies": {
+            "Docnet.Core": {
+              "target": "Package",
+              "version": "[2.6.0, )"
+            },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
               "target": "Package",

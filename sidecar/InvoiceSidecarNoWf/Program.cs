@@ -8,6 +8,8 @@ using System.Reflection;
 using System.Text.Json;
 
 const string PluginId = "com.cctoolbox.jsongrid";
+Console.InputEncoding = new System.Text.UTF8Encoding(false);
+Console.OutputEncoding = new System.Text.UTF8Encoding(false);
 var version = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 1, 19);
 var versionText = version.Major + "." + version.Minor + "." + Math.Max(0, version.Build);
 var stdout = Console.Out;
@@ -33,10 +35,15 @@ while (true)
                 "plugin/initialize" => new
                 {
                     protocolVersion = 1,
-                    capabilities = new[] { "invoice/printers", "invoice/print", "invoice/version" },
+                    capabilities = new[] { "invoice/printers", "invoice/print", "invoice/preview", "invoice/version", "json/filter", "json/session/load", "json/session/save",
+                        "json/transport/open", "json/transport/write", "json/transport/execute", "json/transport/read", "json/transport/release" },
                     plugin = new { id = PluginId, version = versionText },
                 },
                 "invoice/version" => new { version = versionText },
+                "json/filter" => JsonTools.Filter(parameters),
+                "json/session/load" => JsonTools.LoadSession(),
+                "json/session/save" => JsonTools.SaveSession(parameters),
+                _ when method.StartsWith("json/transport/", StringComparison.Ordinal) => JsonTransport.Call(method, parameters),
                 "invoice/printers" => ListPrinters(),
                 "invoice/print" => Print(parameters),
                 "invoice/preview" => Preview(parameters),

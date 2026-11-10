@@ -1,5 +1,11 @@
 {
   "name": "dbx-cc-toolbox",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "node test-grid.mjs && node test-json-core.mjs",
+    "test:ui": "node test-ui.mjs",
+    "test:json:sidecar": "dotnet build sidecar/InvoiceSidecarNoWf -c Release && node test-json-sidecar.mjs",
+    "test:json:host": "dotnet build sidecar/InvoiceSidecarNoWf -c Release && node test-json-host.mjs"
+  }
 }

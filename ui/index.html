@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CC 工具箱 · JSON 解析</title>
+<title>CC 工具箱</title>
 <link rel="icon" href="assets/plugin.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="brand"><span class="logo">CC</span><span class="title">JSON 解析</span></div>
+    <div class="brand"><span class="logo">CC</span><span class="title" id="tool-title">JSON 解析</span></div>
     <div class="actions" id="actions">
       <button data-act="sample">示例</button>
       <button data-act="format">格式化</button>
@@ -18,29 +18,238 @@
       <button data-act="validate">校验</button>
       <button data-act="clear">清空</button>
       <button data-act="find">查找</button>
+      <button data-act="wrap" class="active" title="按当前宽度自动换行">换行</button>
       <button data-act="filter">高级筛选</button>
       <button data-act="export">导出 CSV</button>
       <button data-act="theme" title="切换明暗">主题</button>
     </div>
   </header>
 
-  <main class="split">
-    <section class="pane editor-pane">
-      <div class="pane-head"><span>JSON</span><span class="hint" id="editor-hint"></span></div>
-      <div class="editor-wrap">
-        <div class="gutter" id="gutter">1</div>
-        <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder='在此粘贴 JSON，例如：{"id":1,"name":"demo","tags":["a","b"]}'></textarea>
-      </div>
-    </section>
+  <div class="workspace">
+    <aside class="sidebar" id="sidebar">
+      <div class="side-group">数据工具</div>
+      <button type="button" class="side-item" data-tool="home">首页数据概览</button>
+      <button type="button" class="side-item" data-tool="import">临时数据建表</button>
+      <button type="button" class="side-item" data-tool="csvviewer">CSV 文件预览</button>
+      <button type="button" class="side-item" data-tool="csvcompare">CSV 内容比对</button>
+      <button type="button" class="side-item" data-tool="quicksheet">快速建数据表</button>
+      <button type="button" class="side-item" data-tool="validation">数据验证排查</button>
+      <div class="side-group">开发工具</div>
+      <button type="button" class="side-item active" data-tool="json">JSON 数据解析</button>
+      <button type="button" class="side-item" data-tool="jsondiff">JSON 内容比对</button>
+      <button type="button" class="side-item" data-tool="drawboard">在线绘图工具</button>
+      <div class="side-group">办公工具</div>
+      <button type="button" class="side-item" data-tool="invoice">发票打印操作</button>
+      <div class="side-group">系统</div>
+      <button type="button" class="side-item" data-tool="settings">系统参数配置</button>
+    </aside>
 
-    <section class="pane grid-pane">
-      <div class="pane-head"><span>GRID</span><span class="hint" id="grid-hint"></span></div>
-      <div class="grid-wrap" id="grid"></div>
-    </section>
-  </main>
+    <div class="main">
+      <section class="tool-pane active" id="tool-json">
+        <nav class="tabbar" id="tabbar">
+          <div class="tabs" id="tabs"></div>
+          <button class="tab-add" id="tab-add" type="button" title="新增解析窗口">＋</button>
+        </nav>
+        <main class="split" id="split">
+          <section class="pane editor-pane">
+            <div class="pane-head"><span>JSON</span><span class="hint" id="editor-hint"></span></div>
+            <div class="editor-wrap">
+              <div class="gutter" id="gutter">1</div>
+              <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder='在此粘贴 JSON，例如：{"id":1,"name":"demo","tags":["a","b"]}'></textarea>
+            </div>
+          </section>
+          <div class="splitter" id="splitter" title="拖动调整左右宽度，双击恢复默认"></div>
+          <section class="pane grid-pane">
+            <div class="pane-head"><span>GRID</span><span class="hint" id="grid-hint"></span></div>
+            <div class="grid-wrap" id="grid"></div>
+          </section>
+        </main>
+      </section>
+
+      <section class="tool-pane" id="tool-jsondiff" hidden>
+        <div class="tool-head"><span>JSON 内容比对</span><span class="hint" id="diff-hint"></span></div>
+        <div class="diff-grid">
+          <textarea id="diff-left" spellcheck="false" placeholder="粘贴原始 JSON"></textarea>
+          <textarea id="diff-right" spellcheck="false" placeholder="粘贴对比 JSON"></textarea>
+        </div>
+        <div class="tool-actions">
+          <input type="file" id="diff-file-left" accept=".json,application/json" title="导入左侧 JSON 文件" />
+          <input type="file" id="diff-file-right" accept=".json,application/json" title="导入右侧 JSON 文件" />
+          <select id="diff-mode">
+            <option value="tree">结构差异（推荐）</option>
+            <option value="text">文本行差异</option>
+          </select>
+          <button id="diff-run" type="button">开始比对</button>
+          <button id="diff-swap" type="button">交换两侧</button>
+          <button id="diff-format" type="button">格式化两侧</button>
+          <button id="diff-sample" type="button">示例</button>
+        </div>
+        <div id="diff-result" class="diff-result"><div class="tool-empty">两侧内容相同或尚未比对</div></div>
+      </section>
+
+      <section class="tool-pane" id="tool-csvcompare" hidden>
+        <div class="tool-head"><span>CSV 内容比对</span><span class="hint" id="cmp-hint">选择两个 CSV 文件后比对</span></div>
+        <div class="tool-actions">
+          <label>A：<input type="file" id="cmp-file-a" accept=".csv,text/csv" /></label>
+          <label>B：<input type="file" id="cmp-file-b" accept=".csv,text/csv" /></label>
+          <input id="cmp-keys" placeholder="主键列（逗号分隔，可空=按行号）" />
+          <button id="cmp-run" type="button">开始比对</button>
+          <button id="cmp-swap" type="button">交换 A/B</button>
+          <button id="cmp-export" type="button">导出差异 CSV</button>
+        </div>
+        <div id="cmp-summary" class="diff-summary"></div>
+        <div id="cmp-result" class="csv-table"><div class="tool-empty">选择 A、B 两个 CSV 文件后点击「开始比对」</div></div>
+      </section>
+
+      <section class="tool-pane" id="tool-csvviewer" hidden>
+        <div class="tool-head"><span>CSV 文件预览</span><span class="hint" id="csv-info"></span></div>
+        <div class="tool-actions">
+          <input type="file" id="csv-file" accept=".csv,text/csv" />
+          <button id="csv-clear" type="button">清空</button>
+        </div>
+        <div id="csv-table" class="csv-table"><div class="tool-empty">选择一个 CSV 文件后在这里预览</div></div>
+      </section>
+
+      <section class="tool-pane" id="tool-drawboard" hidden>
+        <div class="tool-head"><span>在线绘图工具</span><span class="hint" id="draw-hint"></span></div>
+        <div class="tool-actions">
+          <input type="color" id="draw-color" value="#2e7d32" title="画笔颜色" />
+          <input type="range" id="draw-size" min="1" max="12" value="3" title="画笔粗细" />
+          <button id="draw-clear" type="button">清空画布</button>
+          <button id="draw-save" type="button">保存 PNG</button>
+        </div>
+        <div class="draw-wrap"><canvas id="draw-canvas"></canvas></div>
+      </section>
+
+      <section class="tool-pane" id="tool-settings" hidden>
+        <div class="tool-head"><span>系统参数配置</span><span class="hint">本地保存，仅影响本插件</span></div>
+        <div class="settings-list">
+          <div class="settings-row"><span>界面主题</span><button id="set-theme" type="button">切换明暗</button></div>
+          <div class="settings-row"><span>字号</span><button id="set-font-up" type="button">放大</button><button id="set-font-down" type="button">缩小</button></div>
+          <div class="settings-row"><span>批量 INSERT 每批行数</span><input id="set-batch" type="number" min="1" max="1000" style="width:100px" /> <button id="set-batch-save" type="button">保存</button></div>
+          <div class="settings-row"><span>本地缓存</span><button id="set-clear" type="button">清除页签与设置缓存</button></div>
+          <div class="settings-row"><span>版本</span><span id="set-version">-</span></div>
+        </div>
+      </section>
+
+      <section class="tool-pane" id="tool-home" hidden>
+        <div class="tool-head"><span>首页数据概览</span><span class="hint" id="home-hint">读取 DBX 连接信息</span></div>
+        <div class="tool-actions">
+          <button id="home-refresh" type="button">刷新连接信息</button>
+        </div>
+        <div class="tool-actions">
+          <button type="button" class="home-link" data-goto="import">前往临时建表</button>
+          <button type="button" class="home-link" data-goto="json">前往 JSON 解析</button>
+          <button type="button" class="home-link" data-goto="jsondiff">前往 JSON 比对</button>
+          <button type="button" class="home-link" data-goto="csvviewer">前往 CSV 预览</button>
+          <button type="button" class="home-link" data-goto="invoice">前往发票打印</button>
+        </div>
+        <div class="home-cards" id="home-cards"><div class="tool-empty">点击「刷新连接信息」读取当前 DBX 的连接列表</div></div>
+      </section>
+
+      <section class="tool-pane" id="tool-import" hidden>
+        <div class="tool-head"><span>临时数据建表</span><span class="hint" id="import-hint">粘贴 JSON / CSV，生成建表与插入 SQL</span></div>
+        <div class="tool-actions">
+          <input type="file" id="import-file" accept=".csv,.xlsx,.xls,text/csv" title="导入 CSV / Excel 文件" />
+          <input id="import-table" placeholder="表名（如 tmp_orders）" value="tmp_data" />
+          <select id="import-dialect">
+            <option value="postgres">PostgreSQL</option>
+            <option value="mysql">MySQL</option>
+            <option value="sqlite">SQLite</option>
+            <option value="mssql">SQL Server</option>
+            <option value="oracle">Oracle</option>
+          </select>
+          <button id="import-run" type="button">生成 SQL</button>
+          <button id="import-copy" type="button">复制 SQL</button>
+        </div>
+        <textarea id="import-source" class="sql-input" spellcheck="false" placeholder='粘贴数据，例如：[{"id":1,"name":"demo"}] 或 CSV 文本'></textarea>
+        <textarea id="import-sql" class="sql-output" spellcheck="false" readonly placeholder="生成的 CREATE TABLE / INSERT 语句会显示在这里"></textarea>
+      </section>
+
+      <section class="tool-pane" id="tool-quicksheet" hidden>
+        <div class="tool-head"><span>快速建数据表</span><span class="hint">定义字段并生成 CREATE TABLE</span></div>
+        <div class="tool-actions">
+          <input id="sheet-table" placeholder="表名" value="new_table" />
+          <select id="sheet-dialect">
+            <option value="postgres">PostgreSQL</option>
+            <option value="mysql">MySQL</option>
+            <option value="sqlite">SQLite</option>
+            <option value="mssql">SQL Server</option>
+            <option value="oracle">Oracle</option>
+          </select>
+          <button id="sheet-add-col" type="button">添加字段</button>
+          <button id="sheet-run" type="button">生成 SQL</button>
+          <button id="sheet-copy" type="button">复制 SQL</button>
+        </div>
+        <textarea id="sheet-insert" class="sql-input" spellcheck="false" placeholder="或粘贴 INSERT SQL，自动解析表名/字段/类型并生成 CREATE TABLE"></textarea>
+        <div class="tool-actions">
+          <button id="sheet-parse-insert" type="button">从 INSERT 解析</button>
+        </div>
+        <div id="sheet-columns" class="sheet-columns"></div>
+        <textarea id="sheet-sql" class="sql-output" spellcheck="false" readonly placeholder="生成的 CREATE TABLE 语句会显示在这里"></textarea>
+      </section>
+
+      <section class="tool-pane" id="tool-validation" hidden>
+        <div class="tool-head"><span>数据验证排查</span><span class="hint">生成只读校验 SQL，可直接在 DBX 执行</span></div>
+        <div class="tool-actions">
+          <select id="val-connection"></select>
+          <input id="val-table" placeholder="表名，如 public.orders" />
+          <input id="val-columns" placeholder="字段（逗号分隔），留空表示全部" />
+          <button id="val-generate" type="button">生成校验 SQL</button>
+          <button id="val-run" type="button">执行校验</button>
+          <button id="val-copy" type="button">复制 SQL</button>
+        </div>
+        <div class="tool-actions">
+          <label><input type="checkbox" id="val-null" checked /> 空值</label>
+          <label><input type="checkbox" id="val-dup" checked /> 重复值</label>
+          <label><input type="checkbox" id="val-len" checked /> 超长</label>
+          <label><input type="checkbox" id="val-enum" /> 枚举外值</label>
+          <input id="val-enum-values" placeholder="允许的枚举值，逗号分隔" />
+          <input id="val-dup-columns" placeholder="重复值检查字段（默认第一个字段）" />
+          <input id="val-max-len" type="number" value="255" title="最大长度" />
+        </div>
+        <textarea id="val-sql" class="sql-output" spellcheck="false" readonly placeholder="校验 SQL 会显示在这里"></textarea>
+        <div id="val-result" class="csv-table"><div class="tool-empty">连接可用时可直接执行校验并查看结果</div></div>
+
+        <div class="tool-head" style="height:auto;padding:6px 10px">离线数据校验（不需要数据库连接）</div>
+        <textarea id="val-source" class="sql-input" spellcheck="false" placeholder="粘贴 INSERT SQL、CSV 或 JSON 数组，直接在本地按规则校验"></textarea>
+        <div class="tool-actions">
+          <input id="val-regex" placeholder="正则（可选，例如 ^1\d{10}$）" />
+          <button id="val-offline-run" type="button">离线校验</button>
+          <button id="val-offline-export" type="button">导出报告 CSV</button>
+        </div>
+        <div id="val-offline-result" class="csv-table"><div class="tool-empty">离线校验结果会显示在这里</div></div>
+      </section>
+
+      <section class="tool-pane" id="tool-invoice" hidden>
+        <div class="tool-head"><span>发票打印操作</span><span class="hint" id="inv-hint">读取打印机…</span></div>
+        <div class="tool-actions">
+          <button id="inv-refresh" type="button">刷新打印机</button>
+          <select id="inv-printer"></select>
+          <label>版式 <select id="inv-layout"><option value="1">1 张/页</option><option value="2" selected>2 张/页</option><option value="4">4 张/页</option></select></label>
+          <label>份数 <input id="inv-copies" type="number" value="1" min="1" max="99" style="width:70px" /></label>
+          <label>纸张 <select id="inv-paper"><option value="A4">A4</option><option value="invoice">发票纸 240×140mm</option><option value="custom">自定义</option></select></label>
+          <label>宽 <input id="inv-paper-w" type="number" value="240" style="width:80px" /> 高 <input id="inv-paper-h" type="number" value="140" style="width:80px" /> mm</label>
+          <label>套打偏移 X <input id="inv-offset-x" type="number" step="0.5" value="0" style="width:70px" /> Y <input id="inv-offset-y" type="number" step="0.5" value="0" style="width:70px" /> mm</label>
+        </div>
+        <div class="tool-actions">
+          <input type="file" id="inv-files" accept="image/*,.pdf,application/pdf" multiple />
+          <button id="inv-preview" type="button">生成预览</button>
+          <button id="inv-print" type="button">打印</button>
+          <span class="hint">支持 PDF / 图片发票；打印需要 windows-x64 版本插件</span>
+        </div>
+        <div id="inv-preview-area" class="invoice-preview"><div class="tool-empty">选择发票图片后可生成预览（每页 1/2/4 张）</div></div>
+      </section>
+
+      <section class="tool-pane" id="tool-placeholder" hidden>
+        <div class="tool-empty" id="placeholder-text">该功能开发中</div>
+      </section>
+    </div>
+  </div>
 
   <footer class="statusbar">
     <span id="status">就绪</span>
+    <span id="json-save-state" title="文档自动保存状态"></span>
     <span class="status-right" id="stats"></span>
   </footer>
 </div>
@@ -74,6 +283,7 @@ return Array.isArray(data) ? data.filter((x) => x && x.score > 60) : data;</text
 </div>
 
 <script src="assets/lodash.min.js"></script>
+<script src="assets/xlsx.full.min.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

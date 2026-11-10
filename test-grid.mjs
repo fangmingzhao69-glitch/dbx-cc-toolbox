@@ -1,4 +1,5 @@
 import { parseJsonDocument, renderRoot, toCsv, summarize } from './ui/js/json-grid.js';
+import { createGridView } from './ui/js/json-view.js';
 
 const sample = {
   id: 1,
@@ -14,14 +15,18 @@ const sample = {
 const parsed = parseJsonDocument(JSON.stringify(sample));
 if (!parsed.ok) throw new Error('parse failed');
 const html = renderRoot(parsed.data);
+const model = createGridView(parsed.document);
+const rowsNode = parsed.document.root.children.find(n => n.key === 'rows');
+const rowsHtml = model.render(rowsNode.id);
 const checks = [
   ['has object table', html.includes('class="jgrid kv"')],
-  ['has object array table', html.includes('class="jgrid objarray"')],
-  ['has count badge', html.includes('class="badge"') && html.includes('[3]')],
+  ['object array renders when requested', rowsHtml.includes('class="jgrid objarray"')],
+  ['collapsed children have no eager table', (html.match(/<table /g) || []).length === 1],
+  ['has count badge', html.includes('class="badge"') && html.includes('[2]')],
   ['has toggle buttons', (html.match(/class="tgl"/g) || []).length >= 3],
   ['nested hidden by default', html.includes('hidden')],
   ['has type class string', html.includes('class="v string"')],
-  ['has null', html.includes('class="v null"')],
+  ['has null', rowsHtml.includes('class="v null"')],
 ];
 for (const [name, ok] of checks) console.log((ok ? 'PASS ' : 'FAIL ') + name);
 if (checks.some(([, ok]) => !ok)) process.exit(1);

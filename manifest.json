@@ -2,17 +2,19 @@
   "manifest_version": 1,
   "id": "com.cctoolbox.jsongrid",
   "name": "CC 工具箱 · JSON 解析",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "cctoolbox",
   "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
   "icon": "assets/plugin.svg",
-  "source": "https://github.com/chenmo02/xx",
+  "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.2",
   "engines": {
     "dbx": ">=0.6.0",
     "host_api": "^1.4"
   },
   "permissions": [
-    "host.storage"
+    "host.storage",
+    "host.connections:read",
+    "host.data:read"
   ],
   "entrypoints": {
     "backend": {

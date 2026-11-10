@@ -2,6 +2,8 @@
 
 在 DBX 工作台里直接解析、浏览 JSON——不需要启动外部程序。
 
+当前自托管仓库版本：**0.2.2（Windows x64）**。本版修复 JSON 数值保真、原文定位、多页签同步和沙箱内筛选、保存及导出，详见 [更新说明](docs/release-0.2.2.md)。在 DBX 的插件仓库设置中刷新 `cctoolbox.local` 后更新已安装插件；仅推送源码不会产生更新提示。
+
 ![screenshot](docs/screenshot.png)
 
 ## 功能（工具箱）

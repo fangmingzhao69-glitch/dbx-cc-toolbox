@@ -12,6 +12,8 @@ const pluginRoot = path.resolve(here, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'manifest.json'), 'utf8'));
 const pluginId = manifest.id;
 const version = manifest.version;
+const notesIndex = process.argv.indexOf('--release-notes-file');
+const releaseNotes = notesIndex >= 0 ? fs.readFileSync(path.resolve(process.argv[notesIndex + 1]), 'utf8').trim() : 'CC 工具箱 v' + version;
 const hasBackend = Boolean(manifest.entrypoints && manifest.entrypoints.backend);
 const target = hasBackend ? 'windows-x64' : 'universal';
 const releaseBaseIndex = process.argv.indexOf('--release-url-base');
@@ -55,6 +57,7 @@ const publicKey = crypto.createPublicKey({ key: Buffer.from(keys.publicKeyBase64
 // 1. 收集要打包的文件：原生插件直接读源码目录（manifest/assets/ui/bin），纯前端读未签名 dbxp
 const files = new Map();
 const collectDirectory = (relative) => {
+  if (/\.pdb$/i.test(relative)) return;
   const full = path.join(pluginRoot, relative);
   if (!fs.existsSync(full)) return;
   const stat = fs.statSync(full);
@@ -62,7 +65,7 @@ const collectDirectory = (relative) => {
   for (const entry of fs.readdirSync(full, { withFileTypes: true })) {
     const child = relative + '/' + entry.name;
     if (entry.isDirectory()) collectDirectory(child);
-    else if (entry.isFile()) files.set(child, fs.readFileSync(path.join(pluginRoot, child)));
+    else if (entry.isFile() && !/\.pdb$/i.test(child)) files.set(child, fs.readFileSync(path.join(pluginRoot, child)));
   }
 };
 if (hasBackend) {
@@ -111,7 +114,7 @@ const size = signedBytes.length;
 const rawPub = Buffer.from(keys.publicKeyBase64, 'base64');
 const spki = Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), rawPub]);
 const verifyKey = crypto.createPublicKey({ key: spki, format: 'der', type: 'spki' });
-if (!crypto.verify(null, checksumsBytes, verifyKey, crypto.sign(null, checksumsBytes, privateKey))) {
+if (!crypto.verify(null, checksumsBytes, verifyKey, Buffer.from(JSON.parse(signatureBytes.toString('utf8')).signature, 'base64'))) {
   throw new Error('签名自检失败');
 }
 console.log('已签名并自检通过：' + signedPath);
@@ -142,7 +145,7 @@ const catalog = {
         {
           version,
           releasedAt: new Date().toISOString(),
-          releaseNotes: '首个版本：JSON 文本 + 表格视图、嵌套展开、高级筛选、CSV 导出、淡绿/深色主题。',
+          releaseNotes,
           artifacts: [
             {
               target,

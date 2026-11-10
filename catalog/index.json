@@ -6,14 +6,14 @@
     "name": "CC 工具箱自托管仓库",
     "homepage": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/catalog/index.json"
   },
-  "generatedAt": "2026-10-25T09:35:03.215Z",
+  "generatedAt": "2026-11-10T15:47:10.400Z",
   "plugins": [
     {
       "id": "com.cctoolbox.jsongrid",
       "name": "CC 工具箱 · JSON 解析",
       "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
       "publisher": "cctoolbox",
-      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.1/plugin.svg",
+      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.2/plugin.svg",
       "tags": [
         "json",
         "grid",
@@ -21,22 +21,24 @@
         "cctoolbox"
       ],
       "permissions": [
-        "host.storage"
+        "host.storage",
+        "host.connections:read",
+        "host.data:read"
       ],
-      "source": "https://github.com/chenmo02/xx",
-      "latestVersion": "0.2.1",
+      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.2",
+      "latestVersion": "0.2.2",
       "versions": [
         {
-          "version": "0.2.1",
-          "releasedAt": "2026-10-25T09:35:03.215Z",
-          "releaseNotes": "首个版本：JSON 文本 + 表格视图、嵌套展开、高级筛选、CSV 导出、淡绿/深色主题。",
+          "version": "0.2.2",
+          "releasedAt": "2026-11-10T15:47:10.400Z",
+          "releaseNotes": "# CC 工具箱 0.2.2\n\n本版修复 JSON 模块的数值保真、原文定位、页签状态与导出，并补齐 DBX 沙箱中的存储和筛选适配。\n\n- 保留大整数、长小数和指数原始字面量，格式化和压缩不再改变数值。\n- 修复特殊键、转义键的原文定位；筛选与重排只对来源和内容均可靠的节点提供原文跳转。\n- 修复快速切换页签显示旧表格、非法输入残留筛选结果及 Tab 缩进未保存。\n- 正确显示根值 0、false、null 和空字符串；缺失字段不读取原型链。\n- CSV 中嵌套对象保留 JSON 内容。\n- 嵌套按需展开，数组每页 100 行，宽表每次 50 列；恢复展开、分页及嵌套滚动。\n- DBX 内通过受限 C# 侧车解释器执行高级筛选，使用宿主接口导出文件，分块传输和原子保存大文档。\n- 修复侧车中文 UTF-8 编码；页签支持沙箱内重命名。\n\n本版清单声明工具箱实际调用的存储、连接列表及只读数据权限。数据库建表和导入工具生成 SQL；数据查询仅使用宿主只读 API。清单 source 指向本版源码 tag，发行包不包含 PDB。\n\n验证：原有 50 项界面检查、14 组核心检查、8 组真实侧车检查和 15 组沙箱/桥接检查通过。单文件自包含侧车同样通过侧车和沙箱检查。\n\n更新：在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再到已安装插件更新 CC 工具箱。仓库地址和签名 Key ID 不变。",
           "artifacts": [
             {
               "target": "windows-x64",
-              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.1/com.cctoolbox.jsongrid-0.2.1-windows-x64.signed.dbxp",
-              "sha256": "cff5ec250763b5d2bf7f204e3a07512870ba77ac42daf42abb15d2926832cdab",
+              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.2/com.cctoolbox.jsongrid-0.2.2-windows-x64.signed.dbxp",
+              "sha256": "c4157d6554a2aa945fc8069e7aee62c3b031fd5142992b71b03aed92893b7f9e",
               "signingKeyId": "cctoolbox-local-2026",
-              "size": 36476514
+              "size": 37632362
             }
           ]
         }

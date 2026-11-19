@@ -6,14 +6,14 @@
     "name": "CC 工具箱自托管仓库",
     "homepage": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/catalog/index.json"
   },
-  "generatedAt": "2026-11-19T02:37:40.492Z",
+  "generatedAt": "2026-11-19T09:13:29.611Z",
   "plugins": [
     {
       "id": "com.cctoolbox.jsongrid",
       "name": "CC 工具箱 · JSON 解析",
       "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
       "publisher": "cctoolbox",
-      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.3/plugin.svg",
+      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.4/plugin.svg",
       "tags": [
         "json",
         "grid",
@@ -25,20 +25,20 @@
         "host.connections:read",
         "host.data:read"
       ],
-      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.3",
-      "latestVersion": "0.2.3",
+      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.4",
+      "latestVersion": "0.2.4",
       "versions": [
         {
-          "version": "0.2.3",
-          "releasedAt": "2026-11-19T02:37:40.493Z",
-          "releaseNotes": "# CC 工具箱 0.2.3\n\n本版更新发票打印工具，适用于 Windows x64。\n\n- 批量导入 PDF 或图片，支持选择文件夹、按内容去重、调整顺序、逐项删除和指定页码。分块传输避免较大文件超过 DBX 单次请求限制。\n- 原稿和排版预览支持翻页、旋转、缩放。排版支持横纵向、自定义纸张、四边边距、间距、裁剪线和套打偏移。\n- 预览和打印共用毫米坐标与排版逻辑。可保存、应用或删除打印模板，也可设置份数和质量。\n- 显示任务提交进度、系统队列状态和最近 50 条打印记录。队列未确认完成时，界面会提示查看系统打印队列。\n\n在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再从已安装插件更新 CC 工具箱。继续使用原有仓库信任设置。\n\n已通过 Windows 侧车和 DBX 沙箱模拟测试，覆盖分块传输、PDF 选页、图像旋转、套打预览及打印失败反馈。实体打印机的出纸位置仍需在实际设备上校准。",
+          "version": "0.2.4",
+          "releasedAt": "2026-11-19T09:13:29.611Z",
+          "releaseNotes": "# CC 工具箱 0.2.4\n\n本版改善 JSON 解析页的编辑和阅读体验，适用于 Windows x64。\n\n- 粘贴合法 JSON 后自动缩进并生成表格，保留大整数和指数的原始写法。可用 Ctrl+Z 撤销粘贴，非法 JSON 保留原文并显示解析错误。\n- 每个页签独立保存分割线的位置，重新打开工作台仍可恢复。双击仅重置当前页签。\n- 展开后的嵌套数组可独立滚动。点击「单独查看」可在整个右侧表格区浏览，返回时保留原表展开状态和滚动位置。\n- 表头和行号在滚动时保留可见，长文本可换行，深色主题中的表格文字使用高对比度配色。\n\n在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再从已安装插件更新 CC 工具箱。继续使用原有仓库信任设置。",
           "artifacts": [
             {
               "target": "windows-x64",
-              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.3/com.cctoolbox.jsongrid-0.2.3-windows-x64.signed.dbxp",
-              "sha256": "972e4b26dec8bff20a70224b7dab1b62129c15a35b814ee016c689fc8ebfc0a7",
+              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.4/com.cctoolbox.jsongrid-0.2.4-windows-x64.signed.dbxp",
+              "sha256": "cfbcc52134f2b99d7e995bf519a5aa2dc7ca41c1a43b905857fc405eef405b2e",
               "signingKeyId": "cctoolbox-local-2026",
-              "size": 37649581
+              "size": 37651542
             }
           ]
         }

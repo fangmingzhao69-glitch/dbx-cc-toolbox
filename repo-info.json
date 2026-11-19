@@ -4,7 +4,7 @@
   "repositoryName": "CC 工具箱自托管仓库",
   "keyId": "cctoolbox-local-2026",
   "publicKey": "/c3/+1FI+BT/jfMp05ZFxjoYuCRbhFKAiv+0d7Br4Qo=",
-  "pluginFile": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.3/com.cctoolbox.jsongrid-0.2.3-windows-x64.signed.dbxp",
-  "sha256": "972e4b26dec8bff20a70224b7dab1b62129c15a35b814ee016c689fc8ebfc0a7",
-  "size": 37649581
+  "pluginFile": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.4/com.cctoolbox.jsongrid-0.2.4-windows-x64.signed.dbxp",
+  "sha256": "cfbcc52134f2b99d7e995bf519a5aa2dc7ca41c1a43b905857fc405eef405b2e",
+  "size": 37651542
 }

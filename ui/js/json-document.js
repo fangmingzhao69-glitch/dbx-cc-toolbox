@@ -1,6 +1,6 @@
 // Source text is authoritative. Offsets are UTF-16, matching textarea selections.
 export const pointerSegment = (key) => String(key).replace(/~/g, '~0').replace(/\//g, '~1');
-const MAX_TEXT = 20 * 1024 * 1024;
+export const MAX_TEXT = 20 * 1024 * 1024;
 export function parseDocument(input) {
   const text = String(input ?? '');
   let i = text.charCodeAt(0) === 0xFEFF ? 1 : 0;

@@ -2,8 +2,8 @@ import {
   escapeHtml, formatBytes, parseJsonDocument,
 } from './json-grid.js';
 import { initTools } from './tools.js';
-import { parseDocument, serializeNode, csvDocument, assertFilterSafe, mapFilterOrigins } from './json-document.js';
-import { createGridView } from './json-view.js';
+import { MAX_TEXT, parseDocument, serializeNode, csvDocument, assertFilterSafe, mapFilterOrigins } from './json-document.js';
+import { createGridView, describeContainer } from './json-view.js';
 import { createHostAdapter } from './host-adapter.js';
 
 const editor = document.getElementById('editor');
@@ -15,6 +15,8 @@ let saveGeneration = 0, pendingSave, saving, automaticSaveEnabled = true;
 const saveLabel = document.getElementById('json-save-state');
 const gutter = document.getElementById('gutter');
 const gridHost = document.getElementById('grid');
+const gridFocus = document.getElementById('grid-focus');
+const gridFocusPath = document.getElementById('grid-focus-path');
 const statusEl = document.getElementById('status');
 const statsEl = document.getElementById('stats');
 const editorHint = document.getElementById('editor-hint');
@@ -102,7 +104,7 @@ function renderGutter() {
 let fitRaf = 0;
 function scheduleFitTables() {
   if (fitRaf) return;
-  fitRaf = requestAnimationFrame(() => { fitRaf = 0; fitTables(); fitNestedViewports(); });
+  fitRaf = requestAnimationFrame(() => { fitRaf = 0; fitTables(); });
 }
 
 const MAX_COLUMN_WIDTH = 650; // 约 50 个汉字
@@ -110,18 +112,25 @@ const MAX_COLUMN_WIDTH = 650; // 约 50 个汉字
 function fitTables() {
   const host = gridHost;
   if (!host || !host.clientWidth) return;
+  for (const box of host.querySelectorAll('.nested-box:not([hidden])')) {
+    const parentBlock = box.parentElement.closest('.table-block');
+    const parentBox = box.parentElement.closest('.nested-box');
+    const visibleWidth = parentBox ? parentBlock.clientWidth : host.clientWidth - 16;
+    box.style.width = Math.max(0, visibleWidth) + 'px';
+  }
   host.querySelectorAll('table.jgrid').forEach((table) => {
     // 只取当前表格自己的列，避免把嵌套表格的列也算进来
     const colgroup = table.querySelector(':scope > colgroup');
     const columns = colgroup ? Array.from(colgroup.children) : [];
     if (!columns.length) return;
-    const container = table.closest('.nested-box') || host;
-    const available = Math.max(160, (container.clientWidth || host.clientWidth) - 24);
+    const block = table.parentElement;
+    const nested = Boolean(table.closest('.nested-box'));
+    const available = Math.max(140, block.clientWidth || host.clientWidth - 16);
 
     // 键值表：键列固定约 15 个字符（140px），值列占满剩余宽度
     if (table.classList.contains('kv') && columns.length === 3) {
-      const keyWidth = 140;
-      const valueWidth = Math.max(220, available - 46 - keyWidth);
+      const keyWidth = nested ? Math.max(82, Math.min(140, Math.round(available * .28))) : 140;
+      const valueWidth = Math.max(nested ? 92 : 220, available - 46 - keyWidth);
       columns[0].style.width = '46px';
       columns[1].style.width = keyWidth + 'px';
       columns[2].style.width = valueWidth + 'px';
@@ -130,30 +139,21 @@ function fitTables() {
     }
     // 数组表：值列按可用宽度自适应，最宽 650px；根级占满
     if (table.classList.contains('idx') && columns.length === 2) {
-      const nested = table.closest('.nested-box');
-      const valueWidth = nested
-        ? Math.min(MAX_COLUMN_WIDTH, Math.max(110, available - 46))
-        : Math.max(220, available - 46);
+      const valueWidth = Math.max(nested ? 92 : 220, available - 46);
       columns[0].style.width = '46px';
       columns[1].style.width = valueWidth + 'px';
       table.style.width = (46 + valueWidth) + 'px';
       return;
     }
 
-    let baseTotal = 0;
-    for (const column of columns) {
-      if (!column.dataset.base) column.dataset.base = String(parseFloat(column.style.width) || 0);
-      baseTotal += Number(column.dataset.base);
-    }
-    if (!baseTotal) return;
-    let ratio = Math.min(2.2, Math.max(1, available / baseTotal));
-    for (const column of columns) {
-      const base = Number(column.dataset.base) || 1;
-      ratio = Math.min(ratio, MAX_COLUMN_WIDTH / base);
-    }
-    let total = 0;
-    for (const column of columns) {
-      const width = Math.min(MAX_COLUMN_WIDTH, Math.round(Number(column.dataset.base) * ratio));
+    const dataColumns = columns.slice(1);
+    const maxWidth = Math.min(MAX_COLUMN_WIDTH, Math.max(180, available * .55));
+    const bases = dataColumns.map(column => Math.min(maxWidth, Number(column.dataset.base)));
+    const dataWidth = bases.reduce((sum, width) => sum + width, 0);
+    const ratio = Math.max(1, (available - 46) / (dataWidth || 1));
+    let total = 46;
+    for (const [index, column] of dataColumns.entries()) {
+      const width = Math.min(maxWidth, Math.round(bases[index] * ratio));
       column.style.width = width + 'px';
       total += width;
     }
@@ -191,17 +191,38 @@ function setHint(ok, message) {
 function currentDocument() { return state.filtered?.document || state.parser?.document; }
 function renderGrid() {
   gridModel = null;
+  gridFocus.hidden = true;
   if (!state.parser) { gridHost.innerHTML = '<div class="grid-empty">正在解析当前内容…</div>'; gridHint.textContent = '待解析'; return; }
   if (!state.parser.ok) {
     gridHost.innerHTML = !editor.value.trim() ? '<div class="grid-empty">粘贴或输入 JSON 后，这里会显示表格视图</div>' : '<div class="grid-error">JSON 解析失败<br><span>' + escapeHtml(state.parser.error.message) + '（第 ' + state.parser.error.line + ' 行，第 ' + state.parser.error.column + ' 列）</span></div>';
     gridHint.textContent = editor.value.trim() ? '解析失败' : '等待数据'; return;
   }
-  const doc = currentDocument(); gridModel = createGridView(doc, currentTab()?.view);
-  gridHost.innerHTML = gridModel.render(); gridModel.restore(gridHost);
+  const doc = currentDocument();
+  const model = createGridView(doc, currentTab()?.view);
+  gridModel = model;
+  const root = doc.nodes.get(model.rootId);
+  gridHost.innerHTML = model.render(model.rootId);
+  model.restore(gridHost);
+  if (root !== doc.root) {
+    const path = root.pointer.split('/').slice(1).map(part => part.replace(/~1/g, '/').replace(/~0/g, '~') || '""');
+    const label = path.join(' › ') + ' · ' + describeContainer(root);
+    gridFocusPath.textContent = label;
+    gridFocusPath.title = label;
+    gridFocus.hidden = false;
+    gridFocus.querySelector('[data-focus-root]').hidden = model.view.focus.length <= 1;
+  }
   gridHint.textContent = state.filtered ? state.filtered.origins.size ? '筛选结果（保留来源的节点可定位原文）' : '筛选结果（独立结果，无法定位原文）' : '表格已生成';
   if (doc.duplicates.length) gridHint.textContent += ' · 存在重复字段';
   gridHost.dataset.rootRows = String(doc.root.children.length);
-  scheduleFitTables(); requestAnimationFrame(fitNestedViewports);
+  scheduleFitTables();
+  const position = model.view.viewport[model.rootId]
+    || (root === doc.root ? { top: currentTab()?.gridScrollTop, left: currentTab()?.gridScrollLeft } : null);
+  gridHost.scrollTo(position?.left ?? 0, position?.top ?? 0);
+  requestAnimationFrame(() => {
+    if (gridModel !== model) return;
+    gridHost.scrollTo(position?.left ?? 0, position?.top ?? 0);
+    restoreNestedScroll(model.view.scroll);
+  });
 }
 function parseAndRender({ silent = false } = {}) {
   clearTimeout(editor._timer);
@@ -217,6 +238,8 @@ function onEditorChanged({ immediate = false } = {}) {
   clearTimeout(editor._timer); filterTicket++;
   const tab = currentTab(); if (!tab) return;
   tab.text = editor.value; tab.revision = (tab.revision || 0) + 1; tab.parser = null; tab.filtered = null; tab.view = {};
+  tab.gridScrollTop = 0;
+  tab.gridScrollLeft = 0;
   state.parser = null; state.filtered = null;
   renderGutter(); setStats(); renderGrid(); setHint(true, '待解析'); saveTabs();
   const { id, revision, text } = tab;
@@ -239,7 +262,7 @@ function updateTabText() {
 }
 
 function sessionSnapshot() {
-  return { activeId: state.activeId, tabs: state.tabs.map(t => ({ id: t.id, title: t.title, text: t.text, view: t.filtered ? {} : t.view,
+  return { activeId: state.activeId, tabs: state.tabs.map(t => ({ id: t.id, title: t.title, text: t.text, splitRatio: t.splitRatio, view: t.filtered ? {} : t.view,
     editorScrollTop: t.editorScrollTop, editorSelection: t.editorSelection, gridScrollTop: t.gridScrollTop, gridScrollLeft: t.gridScrollLeft, filterCode: t.filterCode })) };
 }
 function saveTabs() {
@@ -275,6 +298,7 @@ function renderTabs() {
 function saveActiveState() {
   const tab = currentTab();
   if (!tab) return;
+  tab.splitRatio = splitRatio;
   tab.text = editor.value;
   tab.filtered = state.filtered;
   tab.filterCode = filterCode ? filterCode.value : '';
@@ -292,16 +316,15 @@ function activateTab(id, options = {}) {
   const next = state.tabs.find(t => t.id === id); if (!next) return;
   if (options.saveCurrent !== false) saveActiveState();
   clearTimeout(editor._timer); filterTicket++; state.activeId = id; editor.value = next.text || '';
+  setSplitRatio(next.splitRatio ?? DEFAULT_SPLIT);
   state.parser = next.parser || parseJsonDocument(editor.value); next.parser = state.parser; state.filtered = next.filtered || null;
   renderGutter(); renderTabs(); renderGrid(); filterCode.value = next.filterCode ?? filterCode.defaultValue;
   setHint(state.parser.ok, state.parser.ok ? 'JSON 合法' : editor.value.trim() ? '解析失败' : ''); setStats();
   clearTimeout(toast.timer); statusEl.textContent = next.statusMessage || '就绪'; statusEl.className = next.statusClass || '';
   const restore = () => {
     if (state.activeId !== id) return;
-    gridHost.scrollTop = next.gridScrollTop || 0; gridHost.scrollLeft = next.gridScrollLeft || 0;
     if (Array.isArray(next.editorSelection)) editor.setSelectionRange(...next.editorSelection);
     editor.scrollTop = next.editorScrollTop || 0; syncScroll();
-    for (const block of gridHost.querySelectorAll('[data-table-node]')) { const pos = next.view?.scroll?.[block.dataset.tableNode]; if (pos) { block.scrollTop = pos.top; block.scrollLeft = pos.left; } }
   }; restore(); requestAnimationFrame(restore); saveTabs();
 }
 
@@ -499,24 +522,103 @@ function toggleTheme() {
 }
 
 // ---------- 表格交互 ----------
+function restoreNestedScroll(positions, host = gridHost) {
+  for (const block of host.querySelectorAll('.nested-box > [data-table-node]')) {
+    const position = positions[block.dataset.tableNode];
+    if (position) block.scrollTo(position.left, position.top);
+  }
+}
+
+function changeFocus(change) {
+  if (!gridModel) return;
+  const tab = currentTab();
+  tab.view = gridModel.snapshot(gridHost);
+  change(tab.view.focus);
+  renderGrid();
+  if (!gridFocus.hidden) gridFocus.querySelector('[data-focus-back]').focus({ preventScroll: true });
+  saveTabs();
+}
+
+gridFocus.querySelector('[data-focus-back]').addEventListener('click', () => changeFocus(focus => focus.pop()));
+gridFocus.querySelector('[data-focus-root]').addEventListener('click', () => changeFocus(focus => { focus.length = 0; }));
+
 gridHost.addEventListener('click', event => {
   if (!gridModel) return;
-  const page = event.target.closest('[data-page-node]');
-  if (page && !page.disabled) { currentTab().view = gridModel.snapshot(gridHost); currentTab().view.pages[page.dataset.pageNode] = Number(page.dataset.page); renderGrid(); saveTabs(); return; }
-  const columns = event.target.closest('[data-column-node]');
-  if (columns && !columns.disabled) { currentTab().view = gridModel.snapshot(gridHost); currentTab().view.columnPages[columns.dataset.columnNode] = Number(columns.dataset.page); renderGrid(); saveTabs(); return; }
+  const focusButton = event.target.closest('[data-focus-node]');
+  if (focusButton) {
+    changeFocus(focus => focus.push(focusButton.dataset.focusNode));
+    return;
+  }
+  const page = event.target.closest('[data-page-node], [data-column-node]');
+  if (page && !page.disabled) {
+    const tab = currentTab();
+    tab.view = gridModel.snapshot(gridHost);
+    const { pageNode, columnNode } = page.dataset;
+    const id = pageNode || columnNode;
+    const pagination = columnNode ? tab.view.columnPages : tab.view.pages;
+    pagination[id] = Number(page.dataset.page);
+    const positions = id === gridModel.rootId ? tab.view.viewport : tab.view.scroll;
+    const previous = positions[id] || { top: 0, left: 0 };
+    positions[id] = columnNode ? { top: previous.top, left: 0 } : { top: 0, left: previous.left };
+    renderGrid();
+    saveTabs();
+    return;
+  }
   const toggle = event.target.closest('.tgl');
   if (toggle) {
-    const id = toggle.dataset.expand, box = gridHost.querySelector('[data-box="' + id + '"]'); if (!box) return;
-    const opened = gridModel.view.expanded.has(id);
-    if (opened) { gridModel.snapshot(gridHost); gridModel.view.expanded.delete(id); box.hidden = true; box.replaceChildren(); }
-    else { gridModel.view.expanded.add(id); box.hidden = false; box.innerHTML = gridModel.render(id); gridModel.restore(box); }
-    toggle.setAttribute('aria-expanded', String(!opened)); toggle.textContent = opened ? '+' : '−';
-    scheduleFitTables(); requestAnimationFrame(fitNestedViewports); saveActiveState(); saveTabs(); return;
+    const model = gridModel;
+    const id = toggle.dataset.expand;
+    const box = gridHost.querySelector('[data-box="' + id + '"]');
+    if (!box) return;
+    const opened = !model.view.expanded.has(id);
+    if (opened) model.view.expanded.add(id);
+    else {
+      model.snapshot(gridHost);
+      model.view.expanded.delete(id);
+    }
+    model.setExpanded(toggle, box, opened);
+    scheduleFitTables();
+    const rememberExpansion = () => {
+      saveActiveState();
+      saveTabs();
+    };
+    if (opened) requestAnimationFrame(() => {
+      if (gridModel !== model || box.hidden || !box.isConnected) return;
+      restoreNestedScroll(model.view.scroll, box);
+      rememberExpansion();
+    });
+    else rememberExpansion();
+    return;
   }
   const cell = event.target.closest('[data-node][data-kind]'); if (cell) jumpToPath(cell.dataset.node, cell.dataset.kind === 'key');
 });
-editor.addEventListener('input', () => onEditorChanged()); editor.addEventListener('scroll', syncScroll);
+let insertingFormattedPaste = false;
+editor.addEventListener('input', () => { if (!insertingFormattedPaste) onEditorChanged(); });
+editor.addEventListener('scroll', syncScroll);
+editor.addEventListener('paste', event => {
+  if (editor.readOnly) return;
+  const pasted = event.clipboardData?.getData('text/plain');
+  if (!pasted) return;
+  const current = editor.value;
+  const candidate = current.slice(0, editor.selectionStart) + pasted.replace(/\r\n?/g, '\n') + current.slice(editor.selectionEnd);
+  const doc = parseDocument(candidate);
+  if (!doc.ok) return;
+  const formatted = serializeNode(doc.root, true);
+  if (formatted.length > MAX_TEXT) return;
+
+  event.preventDefault();
+  // Use the native text insertion command so the formatted paste can be undone in one step.
+  insertingFormattedPaste = true;
+  try {
+    editor.select();
+    if (!document.execCommand('insertText', false, formatted)) {
+      editor.setRangeText(formatted, 0, editor.value.length, 'end');
+    }
+  } finally {
+    insertingFormattedPaste = false;
+  }
+  onEditorChanged({ immediate: true });
+});
 editor.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); parseAndRender(); }
   if (event.key === 'Tab') { event.preventDefault(); editor.setRangeText('  ', editor.selectionStart, editor.selectionEnd, 'end'); onEditorChanged(); }
@@ -556,62 +658,71 @@ function jumpToPath(id, preferKey) {
   const message = '已定位到第 ' + editor.value.slice(0, start).split('\n').length + ' 行'; clearTimeout(toast.timer); statusEl.textContent = message; statusEl.className = 'ok'; currentTab().statusMessage = message;
 }
 
-// ---------- 嵌套展开表格：固定显示 20 行 ----------
-function fitNestedViewports() {
-  document.querySelectorAll('#grid .nested-box > .table-block').forEach((block) => {
-    const header = block.querySelector(':scope > table > thead');
-    const rows = Array.from(block.querySelectorAll(':scope > table > tbody > tr.row'));
-    if (!rows.length) return;
-    const limit = Math.min(20, rows.length);
-    let height = header ? header.getBoundingClientRect().height : 30;
-    for (let i = 0; i < limit; i += 1) height += rows[i].getBoundingClientRect().height;
-    block.style.maxHeight = Math.ceil(height) + 'px';
-  });
-}
-
-// ---------- 左右分割条 ----------
+// ---------- 每个页签独立的分割线 ----------
 const split = document.getElementById('split');
 const splitter = document.getElementById('splitter');
-let splitDragging = false;
+const DEFAULT_SPLIT = 40;
+let splitRatio = DEFAULT_SPLIT;
+let draggingTabId = null;
 
-function persistSplit() {
-  hostAdapter.set('cc-toolbox-split', split.style.getPropertyValue('--editor-width'));
+function setSplitRatio(value) {
+  splitRatio = Number.isFinite(value) ? Math.round(Math.min(80, Math.max(20, value)) * 100) / 100 : DEFAULT_SPLIT;
+  split.style.setProperty('--editor-width', splitRatio + '%');
+  splitter.setAttribute('aria-valuenow', String(splitRatio));
 }
 
-if (splitter) {
-  splitter.addEventListener('mousedown', (event) => {
-    splitDragging = true;
-    splitter.classList.add('dragging');
-    document.body.classList.add('resizing');
-    event.preventDefault();
-  });
-  window.addEventListener('mousemove', (event) => {
-    if (!splitDragging) return;
-    const rect = split.getBoundingClientRect();
-    const percent = Math.min(80, Math.max(20, ((event.clientX - rect.left) / rect.width) * 100));
-    split.style.setProperty('--editor-width', percent.toFixed(2) + '%');
-    scheduleFitTables();
-    renderGutter();
-  });
-  window.addEventListener('mouseup', () => {
-    if (!splitDragging) return;
-    splitDragging = false;
-    splitter.classList.remove('dragging');
-    document.body.classList.remove('resizing');
-    persistSplit();
-  });
-  splitter.addEventListener('dblclick', () => {
-    split.style.setProperty('--editor-width', '40%');
-    persistSplit();
-    scheduleFitTables();
-    renderGutter();
-  });
+function changeSplit(value, save = true) {
+  const tab = currentTab();
+  if (!tab) return;
+  setSplitRatio(value);
+  tab.splitRatio = splitRatio;
+  scheduleFitTables();
+  renderGutter();
+  if (save) saveTabs();
 }
+
+const stackedSplit = () => getComputedStyle(splitter).cursor === 'row-resize';
+const updateSplitOrientation = () => splitter.setAttribute('aria-orientation', stackedSplit() ? 'horizontal' : 'vertical');
+splitter.addEventListener('mousedown', event => {
+  if (event.button !== 0 || !currentTab()) return;
+  draggingTabId = state.activeId;
+  splitter.classList.add('dragging');
+  document.body.classList.add('resizing');
+  event.preventDefault();
+});
+window.addEventListener('mousemove', event => {
+  if (!draggingTabId || draggingTabId !== state.activeId) return;
+  const rect = split.getBoundingClientRect();
+  const ratio = stackedSplit() ? (event.clientY - rect.top) / rect.height : (event.clientX - rect.left) / rect.width;
+  changeSplit(ratio * 100, false);
+});
+function endSplitDrag() {
+  if (!draggingTabId) return;
+  draggingTabId = null;
+  splitter.classList.remove('dragging');
+  document.body.classList.remove('resizing');
+  saveTabs();
+}
+window.addEventListener('mouseup', endSplitDrag);
+window.addEventListener('blur', endSplitDrag);
+splitter.addEventListener('dblclick', () => changeSplit(DEFAULT_SPLIT));
+splitter.addEventListener('keydown', event => {
+  const [decrease, increase] = stackedSplit() ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight'];
+  if (![decrease, increase, 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  if (event.key === 'Home' || event.key === 'End') changeSplit(event.key === 'Home' ? 20 : 80);
+  else changeSplit(splitRatio + (event.key === decrease ? -2 : 2));
+});
+updateSplitOrientation();
 
 if (window.ResizeObserver) {
   new ResizeObserver(() => scheduleFitTables()).observe(gridHost);
 }
-window.addEventListener('resize', () => scheduleFitTables());
+window.addEventListener('resize', () => {
+  updateSplitOrientation();
+  renderGutter();
+  scheduleFitTables();
+});
 
 // ---------- 与 DBX Host 集成 ----------
 async function initBridge() {
@@ -692,16 +803,17 @@ function initToolShell() {
     try { await clearStorage(); } catch (error) { automaticSaveEnabled = true; throw error; }
   };
   applyTheme(hostAdapter.get('cc-toolbox-theme') === 'dark' ? 'dark' : 'light');
-  const savedSplit = hostAdapter.get('cc-toolbox-split'); if (savedSplit) split.style.setProperty('--editor-width', savedSplit);
+  const legacySplit = Number.parseFloat(hostAdapter.get('cc-toolbox-split', String(DEFAULT_SPLIT)));
   wrapEnabled = hostAdapter.get('cc-toolbox-wrap') !== 'off'; applyWrap();
   const stored = await hostAdapter.loadTabs();
   if (stored && Array.isArray(stored.tabs) && stored.tabs.length) {
     const used = new Set();
     state.tabs = stored.tabs.map((tab, i) => {
       const id = typeof tab.id === 'string' && /^tab-[a-zA-Z0-9-]+$/.test(tab.id) && !used.has(tab.id) ? tab.id : 'tab-restored-' + i; used.add(id);
-      return { ...tab, id, title: String(tab.title || '解析 ' + (i + 1)).slice(0,30), text: typeof tab.text === 'string' ? tab.text : '', revision: 0 };
+      const ratio = Number.isFinite(tab.splitRatio) ? tab.splitRatio : legacySplit;
+      return { ...tab, id, title: String(tab.title || '解析 ' + (i + 1)).slice(0,30), text: typeof tab.text === 'string' ? tab.text : '', splitRatio: ratio, revision: 0 };
     }); state.activeId = state.tabs.some(t => t.id === stored.activeId) ? stored.activeId : state.tabs[0].id;
-  } else { state.tabs = [{ id:'tab-1', title:'解析 1', text:JSON.stringify(SAMPLE,null,2), revision:0 }]; state.activeId = 'tab-1'; }
+  } else { state.tabs = [{ id:'tab-1', title:'解析 1', text:JSON.stringify(SAMPLE,null,2), splitRatio: legacySplit, revision:0 }]; state.activeId = 'tab-1'; }
   activateTab(state.activeId, { saveCurrent:false }); editor.readOnly = false; startupButtons.forEach(button => { button.disabled = false; }); window.__ccToast = toast;
   initToolShell(); initTools({ toast, storage: hostAdapter }); await initBridge();
   window.addEventListener('pagehide', () => { saveActiveState(); void flushSession().catch(() => {}); });

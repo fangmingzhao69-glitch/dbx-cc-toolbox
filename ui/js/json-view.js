@@ -2,13 +2,27 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const container = node => node.kind === 'array' || node.kind === 'object';
 const text = node => node.kind === 'number' ? node.numberRaw : node.kind === 'null' ? 'null' : String(node.value);
 
+export function describeContainer(node) {
+  return (node.kind === 'array' ? '数组' : '对象') + ' · ' + node.children.length + ' 项';
+}
+
 // One table at a time. Folded nodes contain no child table or eager HTML.
 export function createGridView(doc, saved = {}, pageSize = 100) {
-  const view = { pages: { ...saved.pages }, columnPages: { ...saved.columnPages }, expanded: new Set(saved.expanded || []), scroll: { ...saved.scroll } };
+  const focus = Array.isArray(saved.focus) ? saved.focus.filter(id => id !== doc.root.id && doc.nodes.has(id) && container(doc.nodes.get(id))) : [];
+  const view = {
+    pages: { ...saved.pages }, columnPages: { ...saved.columnPages },
+    expanded: new Set(saved.expanded || []), scroll: { ...saved.scroll },
+    focus, viewport: { ...saved.viewport }
+  };
+  const rootId = focus.at(-1) || doc.root.id;
   const attrs = node => ' data-node="' + node.id + '" data-path="' + esc(node.pointer) + '"';
   const scalar = node => '<span class="v ' + node.kind + '" title="' + esc(text(node)) + '">' + esc(text(node)) + '</span>';
-  const val = node => !container(node) ? scalar(node) : '<span class="container-cell"><button type="button" class="tgl" data-target="jgn-' + node.id + '" data-expand="' + node.id + '" aria-expanded="false">+</button><span class="badge">[' + node.children.length + ']</span><span class="ctype">' + (node.kind === 'array' ? '[]' : '{}') + '</span></span>';
-  const nested = (node, columns) => container(node) ? '<tr class="nested-row"><td colspan="' + columns + '"><div class="nested-box" id="jgn-' + node.id + '" data-box="' + node.id + '" hidden></div></td></tr>' : '';
+  const val = node => !container(node) ? scalar(node) : '<span class="container-cell"><button type="button" class="tgl" data-target="jgn-' +
+    node.id + '" data-expand="' + node.id + '" aria-controls="jgn-' + node.id + '" aria-expanded="false" aria-label="展开 ' +
+    describeContainer(node) + '">+</button><span class="badge">[' + node.children.length + ']</span><span class="ctype">' +
+    (node.kind === 'array' ? '[]' : '{}') + '</span></span>';
+  const nested = (node, columns) => container(node) ? '<tr class="nested-row" hidden><td colspan="' + columns +
+    '"><div class="nested-box" id="jgn-' + node.id + '" data-box="' + node.id + '" hidden></div></td></tr>' : '';
   const cell = node => node ? '<td class="val"' + attrs(node) + ' data-kind="value">' + val(node) + '</td>' : '<td class="val missing">⊘</td>';
   function render(id = doc.root.id) {
     const node = doc.nodes.get(id);
@@ -37,10 +51,26 @@ export function createGridView(doc, saved = {}, pageSize = 100) {
       return '<tr class="row"' + attrs(entry) + '><td class="rownum">' + (start + index + 1) + '</td>' +
         (object ? '<td class="key"' + attrs(entry) + ' data-kind="key">' + esc(entry.key) + '</td>' : '') + values.map(cell).join('') + '</tr>' +
         values.filter(Boolean).map(n => nested(n, allWidths.length)).join('');
-    }).join('');
+    }).join('') || '<tr><td colspan="' + allWidths.length + '" class="json-empty-container">' +
+      (object ? '空对象' : '空数组') + '</td></tr>';
     const pager = total > pageSize ? '<div class="json-pager"><button data-page-node="' + id + '" data-page="' + (page - 1) + '"' + (!page ? ' disabled' : '') + '>上一页</button><span>显示 ' + (start + 1) + '–' + Math.min(total, start + pageSize) + '，共 ' + total + ' 项</span><button data-page-node="' + id + '" data-page="' + (page + 1) + '"' + (start + pageSize >= total ? ' disabled' : '') + '>下一页</button></div>' : '';
     const columnPager = allKeys.length > 50 ? '<div class="json-pager"><button data-column-node="' + id + '" data-page="' + (columnPage - 1) + '"' + (!columnPage ? ' disabled' : '') + '>前 50 列</button><span>列 ' + (columnPage * 50 + 1) + '–' + Math.min(allKeys.length, (columnPage + 1) * 50) + '，当前行页共 ' + allKeys.length + ' 列</span><button data-column-node="' + id + '" data-page="' + (columnPage + 1) + '"' + ((columnPage + 1) * 50 >= allKeys.length ? ' disabled' : '') + '>后 50 列</button></div>' : '';
     return '<div class="table-block ' + (object ? 'kv-block' : 'array-block') + '" data-table-node="' + id + '">' + pager + columnPager + '<table class="jgrid ' + (object ? 'kv' : objArray ? 'objarray' : 'idx') + '" style="width:' + allWidths.reduce((a,b) => a+b, 0) + 'px">' + colgroup + head + '<tbody>' + body + '</tbody></table></div>';
+  }
+  function setExpanded(button, box, opened) {
+    const node = doc.nodes.get(button.dataset.expand);
+    button.textContent = opened ? '−' : '+';
+    button.setAttribute('aria-expanded', String(opened));
+    button.setAttribute('aria-label', (opened ? '收起 ' : '展开 ') + describeContainer(node));
+    box.hidden = !opened;
+    box.closest('tr.nested-row').hidden = !opened;
+    if (!opened) {
+      box.replaceChildren();
+      return;
+    }
+    box.innerHTML = '<div class="json-nested-bar"><span>' + describeContainer(node) + '</span>' +
+      '<button type="button" data-focus-node="' + node.id + '">单独查看</button></div>' + render(node.id);
+    restore(box);
   }
   function restore(host) {
     // Traverse only opened branches, so collapsing really releases descendant DOM.
@@ -49,16 +79,15 @@ export function createGridView(doc, saved = {}, pageSize = 100) {
       if (!view.expanded.has(id)) continue;
       const box = host.querySelector('[data-box="' + id + '"]');
       if (!box) continue;
-      button.textContent = '−'; button.setAttribute('aria-expanded', 'true'); box.hidden = false;
-      box.innerHTML = render(id); restore(box);
-    }
-    for (const block of host.querySelectorAll('[data-table-node]')) {
-      const position = view.scroll[block.dataset.tableNode];
-      if (position) { block.scrollTop = position.top; block.scrollLeft = position.left; }
+      setExpanded(button, box, true);
     }
   }
-  return { doc, view, render, restore, snapshot(host) {
+  return { doc, rootId, view, render, restore, setExpanded, snapshot(host) {
     for (const block of host.querySelectorAll('[data-table-node]')) view.scroll[block.dataset.tableNode] = { top: block.scrollTop, left: block.scrollLeft };
-    return { pages: { ...view.pages }, columnPages: { ...view.columnPages }, expanded: [...view.expanded], scroll: { ...view.scroll } };
+    view.viewport[rootId] = { top: host.scrollTop, left: host.scrollLeft };
+    return {
+      pages: { ...view.pages }, columnPages: { ...view.columnPages }, expanded: [...view.expanded],
+      scroll: { ...view.scroll }, focus: [...view.focus], viewport: { ...view.viewport }
+    };
   } };
 }

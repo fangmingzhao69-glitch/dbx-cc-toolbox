@@ -9,7 +9,7 @@ let executablePath;
 for(const name of edgePaths)try{await fs.access(name);executablePath=name;break;}catch{}
 const browser=await puppeteer.launch({executablePath,headless:true});
 let count=0, saveResult={saved:true}, downloads=[], savedSessions=0;
-const settings=new Map();
+const settings=new Map([['cc-toolbox-split','46%']]);
 try {
  const page=await browser.newPage(); await page.setViewport({width:1500,height:950});
  const errors=[]; page.on('pageerror',error=>errors.push(error.message));
@@ -54,6 +54,71 @@ try {
  await check('opaque sandbox denies localStorage and eval, app still starts',async()=>{
    assert.deepEqual(await frame.evaluate(()=>window.__sandboxCheck),['SecurityError','EvalError']);
    assert.ok(await frame.$('table.jgrid'));
+ });
+ await check('paste formats valid JSON immediately without changing numeric tokens', async () => {
+   const raw = '{"id":9007199254740993,"items":[1e400,{"text":"中文😀"}]}';
+   await load('{"old":1}');
+   const result = await frame.evaluate(text => {
+     const editor = document.querySelector('#editor');
+     editor.focus();
+     editor.select();
+     const clipboardData = new DataTransfer();
+     clipboardData.setData('text/plain', text);
+     const paste = new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true });
+     editor.dispatchEvent(paste);
+     return { text: editor.value, formatted: paste.defaultPrevented, grid: document.querySelector('#grid').textContent };
+   }, raw);
+   assert.equal(result.formatted, true);
+   assert.equal(result.text, '{\n  "id": 9007199254740993,\n  "items": [\n    1e400,\n    {\n      "text": "中文😀"\n    }\n  ]\n}');
+   assert.ok(result.grid.includes('9007199254740993'));
+   await page.keyboard.down('Control');
+   await page.keyboard.press('z');
+   await page.keyboard.up('Control');
+   assert.equal(await frame.$eval('#editor', e => e.value), '{"old":1}');
+   const invalidWasIntercepted = await frame.evaluate(() => {
+     const editor = document.querySelector('#editor');
+     editor.select();
+     const clipboardData = new DataTransfer();
+     clipboardData.setData('text/plain', '{"unfinished":');
+     return !editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData, cancelable: true }));
+   });
+   assert.equal(invalidWasIntercepted, false);
+ });
+ await check('splitter stays independent per tab and survives session restore', async () => {
+   const active = () => frame.$eval('.tab.active', tab => tab.dataset.tabId);
+   const ratio = () => frame.$eval('#splitter', handle => Number(handle.getAttribute('aria-valuenow')));
+   const activate = id => frame.click('.tab[data-tab-id="' + id + '"]');
+   const first = await active();
+   assert.equal(await ratio(), 46);
+   await frame.focus('#splitter');
+   await page.keyboard.press('ArrowRight');
+   assert.equal(await ratio(), 48);
+   await frame.click('#tab-add');
+   const second = await active();
+   assert.equal(await ratio(), 40);
+   await frame.focus('#splitter');
+   await page.keyboard.press('End');
+   assert.equal(await ratio(), 80);
+   await activate(first);
+   assert.equal(await ratio(), 48);
+   await page.$eval('iframe', element => { element.style.width = '850px'; });
+   await frame.waitForFunction(() => document.querySelector('#splitter').getAttribute('aria-orientation') === 'horizontal');
+   const height = await frame.$eval('.editor-pane', el => el.getBoundingClientRect().height);
+   await frame.focus('#splitter');
+   await page.keyboard.press('ArrowDown');
+   assert.ok((await frame.$eval('.editor-pane', el => el.getBoundingClientRect().height)) > height);
+   assert.equal(await ratio(), 50);
+   await page.$eval('iframe', element => { element.style.width = '1480px'; });
+   await frame.evaluate(async () => { for (const listener of window.__closeListeners) await listener(); });
+   await Promise.all([frame.waitForNavigation({ waitUntil: 'load' }), frame.evaluate(() => location.reload())]);
+   await frame.waitForFunction(() => document.querySelector('#editor')?.readOnly === false);
+   assert.equal(await ratio(), 50);
+   await activate(second);
+   assert.equal(await ratio(), 80);
+   await frame.$eval('#splitter', handle => handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+   assert.equal(await ratio(), 40);
+   await activate(first);
+   assert.equal(await ratio(), 50);
  });
  await check('J01 formatting and compression keep raw numeric tokens',async()=>{
    const text='{"id":9007199254740993,"d":0.1234567890123456789,"e":1e400,"n":-0}';await load(text);
@@ -119,6 +184,41 @@ try {
    await frame.waitForFunction(()=>[...document.querySelectorAll('.nested-box .table-block')].at(-1)?.scrollTop>0);
    assert.equal(await frame.$$eval('#grid table',e=>e.length),3);await frame.click('#grid .tgl');assert.equal(await frame.$$eval('#grid table',e=>e.length),1);
    await frame.click('[data-page-node][data-page="1"]');assert.ok((await grid()).includes('显示 101–200'));
+ });
+ await check('wide nested arrays stay visible and can be read separately without losing position', async () => {
+   const row = Object.fromEntries(Array.from({ length: 12 }, (_, index) => ['列 ' + index, '内容 '.repeat(12)]));
+   row.items = Array.from({ length: 125 }, (_, n) => ({ n, values: [n, n + 1] }));
+   await load(JSON.stringify([row]));
+   await frame.click('#grid .tgl');
+   const originalLeft = await frame.$eval('#grid', e => e.scrollLeft);
+   assert.ok(originalLeft > 0);
+   const geometry = await frame.evaluate(() => {
+     const grid = document.querySelector('#grid');
+     const box = grid.querySelector('.nested-box:not([hidden])');
+     const area = grid.getBoundingClientRect(), nested = box.getBoundingClientRect();
+     return { area: area.width, box: nested.width, clipped: nested.x < area.x - 1 };
+   });
+   assert.ok(geometry.box <= geometry.area);
+   assert.equal(geometry.clipped, false);
+   await frame.click('#grid [data-focus-node]');
+   assert.match(await frame.$eval('#grid-focus-path', el => el.textContent), /items.*125 项/);
+   assert.equal(await frame.$$eval('#grid > .table-block > table > tbody > tr.row', rows => rows.length), 100);
+   await frame.click('#grid [data-page-node][data-page="1"]');
+   assert.equal(await frame.$$eval('#grid > .table-block > table > tbody > tr.row', rows => rows.length), 25);
+   await frame.click('#grid .tgl');
+   await frame.click('#grid [data-focus-node]');
+   assert.match(await frame.$eval('#grid-focus-path', el => el.textContent), /items.*100.*values/);
+   const active = await frame.$eval('.tab.active', tab => tab.dataset.tabId);
+   await frame.click('#tab-add');
+   assert.equal(await frame.$eval('#grid-focus', el => el.hidden), true);
+   await frame.click('.tab[data-tab-id="' + active + '"]');
+   assert.match(await frame.$eval('#grid-focus-path', el => el.textContent), /items.*100.*values/);
+   await frame.click('#grid-focus [data-focus-back]');
+   assert.match(await grid(), /显示 101–125/);
+   await frame.click('#grid-focus [data-focus-back]');
+   assert.equal(await frame.$eval('#grid-focus', el => el.hidden), true);
+   await frame.waitForFunction(left => Math.abs(document.querySelector('#grid').scrollLeft - left) < 2, {}, originalLeft);
+   assert.ok(await frame.$('#grid .tgl[aria-expanded="true"]'));
  });
  await check('host settings and large document survive close and restore',async()=>{
    await frame.click('[data-act="theme"]');assert.equal(settings.get('cc-toolbox-theme'),'dark');

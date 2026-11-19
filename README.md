@@ -2,7 +2,7 @@
 
 在 DBX 工作台里直接解析、浏览 JSON——不需要启动外部程序。
 
-当前自托管仓库版本为 **0.2.3（Windows x64）**，补齐发票批量导入、套打预览、打印模板和任务状态。在 DBX 的插件仓库设置中刷新 `cctoolbox.local` 后，可从已安装插件更新。详见 [0.2.3 更新说明](docs/release-0.2.3.md)。
+当前自托管仓库版本为 **0.2.4（Windows x64）**。JSON 解析新增粘贴自动格式化、独立页签分割线和嵌套数组的单独查看。在 DBX 的插件仓库设置中刷新 `cctoolbox.local` 后，可从已安装插件更新。详见 [0.2.4 更新说明](docs/release-0.2.4.md)。
 
 ![screenshot](docs/screenshot.png)
 

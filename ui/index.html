@@ -58,9 +58,15 @@
               <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder='在此粘贴 JSON，例如：{"id":1,"name":"demo","tags":["a","b"]}'></textarea>
             </div>
           </section>
-          <div class="splitter" id="splitter" title="拖动调整左右宽度，双击恢复默认"></div>
+          <div class="splitter" id="splitter" role="separator" tabindex="0" aria-label="调整编辑区大小" aria-controls="editor"
+            aria-orientation="vertical" aria-valuemin="20" aria-valuemax="80" aria-valuenow="40" title="拖动或用方向键调整，双击恢复默认"></div>
           <section class="pane grid-pane">
             <div class="pane-head"><span>GRID</span><span class="hint" id="grid-hint"></span></div>
+            <nav id="grid-focus" class="grid-focus" aria-label="当前查看位置" hidden>
+              <button type="button" data-focus-back>返回</button>
+              <button type="button" data-focus-root>回到根表</button>
+              <span id="grid-focus-path"></span>
+            </nav>
             <div class="grid-wrap" id="grid"></div>
           </section>
         </main>

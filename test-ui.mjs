@@ -59,7 +59,7 @@ if (secondToggle.asElement()) {
     const block = document.querySelector('.nested-box .table-block');
     return block ? getComputedStyle(block).maxHeight : '';
   });
-  check('嵌套表格视口约 20 行', parseInt(nestedHeight, 10) > 0 && parseInt(nestedHeight, 10) <= 550);
+  check('嵌套表格拥有独立滚动视口', parseInt(nestedHeight, 10) > 0 && parseInt(nestedHeight, 10) <= 480);
   await page.screenshot({ path: 'E:/cxgj/AIgonzhuoqu/XMWJ/_json-analysis/_shots/dbx-plugin-expand2.png' });
 } else {
   check('second level toggle exists', false);

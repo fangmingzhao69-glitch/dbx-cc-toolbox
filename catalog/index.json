@@ -6,14 +6,14 @@
     "name": "CC 工具箱自托管仓库",
     "homepage": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/catalog/index.json"
   },
-  "generatedAt": "2026-11-10T15:47:10.400Z",
+  "generatedAt": "2026-11-19T02:37:40.492Z",
   "plugins": [
     {
       "id": "com.cctoolbox.jsongrid",
       "name": "CC 工具箱 · JSON 解析",
       "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
       "publisher": "cctoolbox",
-      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.2/plugin.svg",
+      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.3/plugin.svg",
       "tags": [
         "json",
         "grid",
@@ -25,20 +25,20 @@
         "host.connections:read",
         "host.data:read"
       ],
-      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.2",
-      "latestVersion": "0.2.2",
+      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.3",
+      "latestVersion": "0.2.3",
       "versions": [
         {
-          "version": "0.2.2",
-          "releasedAt": "2026-11-10T15:47:10.400Z",
-          "releaseNotes": "# CC 工具箱 0.2.2\n\n本版修复 JSON 模块的数值保真、原文定位、页签状态与导出，并补齐 DBX 沙箱中的存储和筛选适配。\n\n- 保留大整数、长小数和指数原始字面量，格式化和压缩不再改变数值。\n- 修复特殊键、转义键的原文定位；筛选与重排只对来源和内容均可靠的节点提供原文跳转。\n- 修复快速切换页签显示旧表格、非法输入残留筛选结果及 Tab 缩进未保存。\n- 正确显示根值 0、false、null 和空字符串；缺失字段不读取原型链。\n- CSV 中嵌套对象保留 JSON 内容。\n- 嵌套按需展开，数组每页 100 行，宽表每次 50 列；恢复展开、分页及嵌套滚动。\n- DBX 内通过受限 C# 侧车解释器执行高级筛选，使用宿主接口导出文件，分块传输和原子保存大文档。\n- 修复侧车中文 UTF-8 编码；页签支持沙箱内重命名。\n\n本版清单声明工具箱实际调用的存储、连接列表及只读数据权限。数据库建表和导入工具生成 SQL；数据查询仅使用宿主只读 API。清单 source 指向本版源码 tag，发行包不包含 PDB。\n\n验证：原有 50 项界面检查、14 组核心检查、8 组真实侧车检查和 15 组沙箱/桥接检查通过。单文件自包含侧车同样通过侧车和沙箱检查。\n\n更新：在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再到已安装插件更新 CC 工具箱。仓库地址和签名 Key ID 不变。",
+          "version": "0.2.3",
+          "releasedAt": "2026-11-19T02:37:40.493Z",
+          "releaseNotes": "# CC 工具箱 0.2.3\n\n本版更新发票打印工具，适用于 Windows x64。\n\n- 批量导入 PDF 或图片，支持选择文件夹、按内容去重、调整顺序、逐项删除和指定页码。分块传输避免较大文件超过 DBX 单次请求限制。\n- 原稿和排版预览支持翻页、旋转、缩放。排版支持横纵向、自定义纸张、四边边距、间距、裁剪线和套打偏移。\n- 预览和打印共用毫米坐标与排版逻辑。可保存、应用或删除打印模板，也可设置份数和质量。\n- 显示任务提交进度、系统队列状态和最近 50 条打印记录。队列未确认完成时，界面会提示查看系统打印队列。\n\n在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再从已安装插件更新 CC 工具箱。继续使用原有仓库信任设置。\n\n已通过 Windows 侧车和 DBX 沙箱模拟测试，覆盖分块传输、PDF 选页、图像旋转、套打预览及打印失败反馈。实体打印机的出纸位置仍需在实际设备上校准。",
           "artifacts": [
             {
               "target": "windows-x64",
-              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.2/com.cctoolbox.jsongrid-0.2.2-windows-x64.signed.dbxp",
-              "sha256": "c4157d6554a2aa945fc8069e7aee62c3b031fd5142992b71b03aed92893b7f9e",
+              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.3/com.cctoolbox.jsongrid-0.2.3-windows-x64.signed.dbxp",
+              "sha256": "972e4b26dec8bff20a70224b7dab1b62129c15a35b814ee016c689fc8ebfc0a7",
               "signingKeyId": "cctoolbox-local-2026",
-              "size": 37632362
+              "size": 37649581
             }
           ]
         }

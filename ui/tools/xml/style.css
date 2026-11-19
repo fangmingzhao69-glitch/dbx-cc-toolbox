@@ -1,0 +1,33 @@
+/* XML 模块自包含样式，作用域前缀 xml-，不污染全局。 */
+#tool-xml .xml-split {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  flex: 1; min-height: 0; background: var(--border, #d8e6dc);
+}
+#tool-xml .xml-editor-pane,
+#tool-xml .xml-tree-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--surface, #fff); }
+#tool-xml .pane-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 10px; font-size: 12px; font-weight: 600;
+  background: var(--surface-alt, #f2f7f3); border-bottom: 1px solid var(--border, #d8e6dc);
+}
+#tool-xml .xml-editor {
+  flex: 1; min-height: 0; resize: none; border: 0; outline: 0;
+  padding: 10px 12px; font: 13px/1.6 var(--font-mono, ui-monospace, monospace);
+  color: var(--text, #1b2b20); background: var(--surface, #fff); tab-size: 2;
+}
+#tool-xml .xml-tree { flex: 1; min-height: 0; overflow: auto; padding: 8px 6px; font: 13px/1.7 var(--font-mono, ui-monospace, monospace); }
+#tool-xml .xml-row { display: flex; align-items: center; gap: 6px; padding: 1px 4px; border-radius: 4px; cursor: text; white-space: nowrap; }
+#tool-xml .xml-row:hover { background: var(--surface-alt, #f2f7f3); }
+#tool-xml .xml-toggle { border: 0; background: transparent; cursor: pointer; width: 16px; color: var(--muted, #6b7d70); font-size: 12px; padding: 0; }
+#tool-xml .xml-tag { color: #185fa5; font-weight: 600; }
+#tool-xml .xml-attr { color: #8a5a00; }
+#tool-xml .xml-attr-key { color: #854f0b; }
+#tool-xml .xml-attr-val { color: #ba7517; }
+#tool-xml .xml-text { color: #0f6e56; }
+#tool-xml .xml-kind { color: var(--muted, #6b7d70); font-size: 11px; font-style: italic; }
+#tool-xml .xml-error { color: #a32d2d; background: #fcebeb; border: 1px solid #f09595; border-radius: 6px; padding: 8px 10px; margin: 6px; }
+#tool-xml .xml-children[hidden] { display: none; }
+#tool-xml .xml-more { margin-block: 4px; }
+@media (max-width: 900px) {
+  #tool-xml .xml-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+}

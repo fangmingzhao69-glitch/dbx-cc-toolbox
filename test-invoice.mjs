@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import puppeteer from 'puppeteer-core';
+import { openTestBrowser } from './scripts/browser-test-support.mjs';
 import { startSidecar } from './scripts/json-test-support.mjs';
 
 function bitmap(width, height) {
@@ -47,12 +47,6 @@ function pdf() {
   return Buffer.from(text + 'trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
 }
 
-const edgeLocations = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe'];
-let executablePath;
-for (const location of edgeLocations) {
-  try { await fs.access(location); executablePath = location; break; } catch { /* Try other location. */ }
-}
-assert.ok(executablePath, 'Edge is required for the invoice sandbox test');
 const sidecar = await startSidecar();
 let browser;
 try {
@@ -105,7 +99,7 @@ try {
   await assert.rejects(rpc('file/preview', { fileId: pdfFile.id, page: 1, rotation: 0 }), /工作区已失效/);
   console.log('PASS real sidecar: chunk transfer, content dedup, PDF page range, rotation, validation and printer failure');
 
-  browser = await puppeteer.launch({ executablePath, headless: true });
+  browser = await openTestBrowser();
   const page = await browser.newPage();
   await page.setViewport({ width: 1510, height: 950 });
   async function blueCentroid(data) {
@@ -134,8 +128,10 @@ try {
 
   const prefs = new Map(), errors = [];
   let printRequest;
+  let workspaceCloses = 0;
   page.on('pageerror', error => errors.push(error.message));
   await page.exposeFunction('invoiceRpc', async (method, params) => {
+    if (method === 'invoice/workspace/close') workspaceCloses++;
     assert.ok(Buffer.byteLength(JSON.stringify(params || {})) < 2 * 1024 * 1024);
     if (method === 'invoice/printers') return { printers: [{ name: '测试打印机', isDefault: true }] };
     if (method === 'invoice/print') {
@@ -170,8 +166,8 @@ try {
   await page.setContent('<iframe sandbox="allow-scripts" style="width:1500px;height:920px" src="http://127.0.0.1:5199/index.html"></iframe>');
   const frame = await (await page.$('iframe')).contentFrame();
   await frame.waitForSelector('[data-tool=invoice]');
-  await frame.waitForFunction(() => document.querySelector('#inv-printer')?.options.length === 1);
   await frame.click('[data-tool=invoice]');
+  await frame.waitForFunction(() => document.querySelector('#inv-printer')?.options.length === 1);
   await frame.evaluate(({ image, pdf }) => {
     const file = (encoded, name) => new File([Uint8Array.from(atob(encoded), ch => ch.charCodeAt(0))], name);
     const input = document.querySelector('#inv-folder');
@@ -211,7 +207,11 @@ try {
   await frame.waitForFunction(() => document.querySelector('#inv-preview-area img')?.alt.startsWith('排版'));
   if (process.env.CC_INVOICE_SCREENSHOT) await page.screenshot({ path: process.env.CC_INVOICE_SCREENSHOT });
   await frame.click('#inv-print');
+  await frame.click('[data-tool=json]');
   await frame.waitForFunction(() => document.querySelector('#inv-history').textContent.includes('队列完成'));
+  await frame.click('[data-tool=invoice]');
+  assert.equal(workspaceCloses, 0);
+  assert.equal(await frame.$$eval('#inv-list li', entries => entries.length), 2);
   assert.equal(printRequest.files.length, 1);
   assert.deepEqual(printRequest.files.map(({ first, last, rotation }) => [first, last, rotation]), [[2, 2, 90]]);
   assert.equal(printRequest.settings.copies, 2);

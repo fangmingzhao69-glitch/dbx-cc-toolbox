@@ -75,8 +75,9 @@ export async function createHostAdapter(notify = () => {}) {
       await this.saveTabs({ activeId: null, tabs: [] });
       cleared = true;
     },
-    async saveFile(fileName, contentType, text) {
-      const bytes = new TextEncoder().encode(text);
+    async saveFile(fileName, contentType, data) {
+      const bytes = data instanceof Blob ? new Uint8Array(await data.arrayBuffer())
+        : data instanceof Uint8Array ? data.slice() : new TextEncoder().encode(data);
       if (bridge) {
         if (typeof bridge.saveFile !== 'function') throw new Error('宿主不支持文件保存');
         // Host returns null when the user cancels the native dialog.

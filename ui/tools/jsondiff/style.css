@@ -1,0 +1,16 @@
+.diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; flex: 0 0 40%; min-height: 0; }
+.diff-grid textarea {
+  width: 100%; height: 100%; resize: none; border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 8px; font-family: Consolas, monospace; font-size: 14px;
+  line-height: 1.6; background: var(--bg); color: #000;
+}
+.diff-result { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
+.diff-row {
+  display: flex; gap: 8px; font-family: Consolas, monospace; font-size: 14px;
+  padding: 1px 6px; border-radius: 4px; white-space: pre-wrap; word-break: break-word;
+}
+.diff-row .ln { flex: 0 0 96px; color: var(--muted); text-align: right; }
+.diff-add { background: #e6f4ea; }
+.diff-changed { background: #fff4e5; }
+.diff-del { background: #fde7e9; }
+.diff-same { color: #333; }

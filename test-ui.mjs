@@ -1,15 +1,6 @@
-import puppeteer from 'puppeteer-core';
-import fs from 'node:fs';
+import { openTestBrowser } from './scripts/browser-test-support.mjs';
 
-const edgePaths = [
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-];
-let executablePath = null;
-for (const p of edgePaths) { try { const fs = await import('node:fs'); if (fs.existsSync(p)) { executablePath = p; break; } } catch {} }
-if (!executablePath) throw new Error('Edge not found');
-
-const browser = await puppeteer.launch({ executablePath, headless: 'new', args: ['--no-sandbox', '--disable-gpu'] });
+const browser = await openTestBrowser();
 const page = await browser.newPage();
 await page.setViewport({ width: 1500, height: 950 });
 const errors = [];
@@ -38,7 +29,7 @@ const nested = await page.evaluate(() => {
 console.log('nested after expand:', JSON.stringify(nested));
 check('nested table appeared', nested.length > 0 && nested[0].tables > 0);
 check('nested rows rendered', nested.length > 0 && nested[0].rows >= 2);
-await page.screenshot({ path: 'E:/cxgj/AIgonzhuoqu/XMWJ/_json-analysis/_shots/dbx-plugin-expand.png' });
+
 
 // 展开二级 documentIds
 const boxHTML = await page.evaluate(() => {
@@ -60,7 +51,7 @@ if (secondToggle.asElement()) {
     return block ? getComputedStyle(block).maxHeight : '';
   });
   check('嵌套表格拥有独立滚动视口', parseInt(nestedHeight, 10) > 0 && parseInt(nestedHeight, 10) <= 480);
-  await page.screenshot({ path: 'E:/cxgj/AIgonzhuoqu/XMWJ/_json-analysis/_shots/dbx-plugin-expand2.png' });
+
 } else {
   check('second level toggle exists', false);
 }
@@ -287,14 +278,17 @@ const invoiceInfo = await page.evaluate(() => ({
 check('发票打印界面已接入侧车', invoiceInfo.hasPreview && invoiceInfo.hasPrinter && (invoiceInfo.hint.includes('侧车') || invoiceInfo.hint.includes('打印机')));
 
 // CSV 内容比对
-const csvA = 'E:/cxgj/AIgonzhuoqu/XMWJ/_json-analysis/_shots/cmp-a.csv';
-const csvB = 'E:/cxgj/AIgonzhuoqu/XMWJ/_json-analysis/_shots/cmp-b.csv';
-fs.writeFileSync(csvA, 'id,name,score\n1,demo,60\n2,test,70\n3,old,50\n');
-fs.writeFileSync(csvB, 'id,name,score\n1,demo,80\n2,test,70\n4,new,90\n');
-await page.evaluate(() => { document.querySelector('[data-tool="csvcompare"]').click(); });
-await new Promise((r) => setTimeout(r, 300));
-await (await page.$('#cmp-file-a')).uploadFile(csvA);
-await (await page.$('#cmp-file-b')).uploadFile(csvB);
+await page.click('[data-tool="csvcompare"]');
+await page.evaluate(() => {
+  const samples = { a: 'id,name,score\n1,demo,60\n2,test,70\n3,old,50\n', b: 'id,name,score\n1,demo,80\n2,test,70\n4,new,90\n' };
+  for (const [name, sample] of Object.entries(samples)) {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([sample], 'cmp-' + name + '.csv', { type: 'text/csv' }));
+    const input = document.getElementById('cmp-file-' + name);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('change'));
+  }
+});
 await new Promise((r) => setTimeout(r, 400));
 await page.evaluate(() => { document.querySelector('#cmp-keys').value = 'id'; document.querySelector('#cmp-run').click(); });
 await new Promise((r) => setTimeout(r, 500));
@@ -346,7 +340,16 @@ check('INSERT SQL 解析生成建表', sheetInfo.table === 'orders' && sheetInfo
 // Excel 文件导入（SheetJS）
 await page.evaluate(() => { document.querySelector('[data-tool="import"]').click(); });
 await new Promise((r) => setTimeout(r, 300));
-await (await page.$('#import-file')).uploadFile('E:/cxgj/AIgonzhuoqu/XMWJ/_json-analysis/_shots/test-import.xlsx');
+await page.evaluate(() => {
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['name', 'score'], ['demo', 42]]), 'Data');
+  const bytes = XLSX.write(book, { type: 'array', bookType: 'xlsx' });
+  const transfer = new DataTransfer();
+  transfer.items.add(new File([bytes], 'test-import.xlsx'));
+  const input = document.getElementById('import-file');
+  input.files = transfer.files;
+  input.dispatchEvent(new Event('change'));
+});
 await new Promise((r) => setTimeout(r, 900));
 const excelSql = await page.evaluate(() => document.querySelector('#import-sql').value);
 check('Excel 文件导入生成 SQL', excelSql.includes('CREATE TABLE') && excelSql.includes('demo') && excelSql.includes('score'));
@@ -369,7 +372,6 @@ await page.evaluate(() => { document.querySelector('[data-tool="json"]').click()
 await new Promise((r) => setTimeout(r, 300));
 check('可切回 JSON 解析', await page.evaluate(() => !document.querySelector('#tool-json').hidden && !document.querySelector('#actions').hidden));
 
-await page.screenshot({ path: 'E:/cxgj/AIgonzhuoqu/XMWJ/_json-analysis/_shots/dbx-toolbox.png' });
 console.log(results.join('\n'));
 if (errors.length) console.log('console errors: ' + errors.slice(0, 3).join(' | '));
 const failed = results.filter((r) => r.startsWith('FAIL'));

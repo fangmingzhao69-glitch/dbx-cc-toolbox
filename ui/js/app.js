@@ -1,10 +1,12 @@
 import {
   escapeHtml, formatBytes, parseJsonDocument,
 } from './json-grid.js';
-import { initTools } from './tools.js';
 import { MAX_TEXT, parseDocument, serializeNode, csvDocument, assertFilterSafe, mapFilterOrigins } from './json-document.js';
 import { createGridView, describeContainer } from './json-view.js';
 import { createHostAdapter } from './host-adapter.js';
+import { createToolShell } from './registry.js';
+import { createPreferences } from '../shared/storage.js';
+import { createToolHost } from '../shared/bridge.js';
 
 const editor = document.getElementById('editor');
 editor.readOnly = true;
@@ -758,42 +760,6 @@ function extractJsonFromContext(context) {
   } return undefined;
 }
 
-// ---------- 侧边栏 / 多工具切换 ----------
-function initToolShell() {
-  const sidebar = document.getElementById('sidebar');
-  const titleEl = document.getElementById('tool-title');
-  const actions = document.getElementById('actions');
-  const panes = Array.from(document.querySelectorAll('.tool-pane'));
-  const titles = {
-    json: 'JSON 数据解析', home: '首页数据概览', import: '临时数据建表', csvviewer: 'CSV 文件预览',
-    quicksheet: '快速建数据表', validation: '数据验证排查', jsondiff: 'JSON 内容比对',
-    drawboard: '在线绘图工具', invoice: '发票打印操作', settings: '系统参数配置',
-  };
-  function showTool(name) {
-    const targetId = document.getElementById('tool-' + name) ? 'tool-' + name : 'tool-placeholder';
-    panes.forEach((pane) => {
-      const active = pane.id === targetId;
-      pane.hidden = !active;
-      pane.classList.toggle('active', active);
-    });
-    document.querySelectorAll('.side-item').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.tool === name);
-    });
-    titleEl.textContent = titles[name] || 'CC 工具箱';
-    actions.hidden = name !== 'json';
-    hostAdapter.set('cc-toolbox-tool', name);
-  }
-  if (sidebar) {
-    sidebar.addEventListener('click', (event) => {
-      const btn = event.target.closest('.side-item');
-      if (btn) showTool(btn.dataset.tool);
-    });
-  }
-  let saved = null;
-  saved = hostAdapter.get('cc-toolbox-tool');
-  showTool(saved && titles[saved] ? saved : 'json');
-}
-
 // ---------- 启动 ----------
 (async function start() {
   statusEl.textContent = '正在恢复文档…'; hostAdapter = await createHostAdapter(toast);
@@ -815,9 +781,21 @@ function initToolShell() {
     }); state.activeId = state.tabs.some(t => t.id === stored.activeId) ? stored.activeId : state.tabs[0].id;
   } else { state.tabs = [{ id:'tab-1', title:'解析 1', text:JSON.stringify(SAMPLE,null,2), splitRatio: legacySplit, revision:0 }]; state.activeId = 'tab-1'; }
   activateTab(state.activeId, { saveCurrent:false }); editor.readOnly = false; startupButtons.forEach(button => { button.disabled = false; }); window.__ccToast = toast;
-  initToolShell(); initTools({ toast, storage: hostAdapter }); await initBridge();
-  window.addEventListener('pagehide', () => { saveActiveState(); void flushSession().catch(() => {}); });
-  hostAdapter.bridge?.workbench?.onClose(async () => { saveActiveState(); await flushSession(); await hostAdapter.flush(); });
-
-
+  const zoom = Number(hostAdapter.get('cc-toolbox-zoom', '1'));
+  if (zoom >= .85 && zoom <= 1.35) document.body.style.zoom = String(Math.round(zoom * 100) / 100);
+  const preferences = createPreferences(hostAdapter.bridge);
+  const shell = createToolShell({
+    sidebar: document.getElementById('sidebar'), main: document.querySelector('.main'),
+    title: document.getElementById('tool-title'), actions: document.getElementById('actions'),
+    context: { toast, settings: hostAdapter, preferences, bridge: hostAdapter.bridge,
+      host: createToolHost(hostAdapter.bridge), saveFile: hostAdapter.saveFile },
+  });
+  const close = async () => {
+    saveActiveState();
+    await Promise.all([flushSession(), shell.dispose(), preferences.flush()]);
+    await hostAdapter.flush();
+  };
+  window.addEventListener('pagehide', () => { void close().catch(() => {}); });
+  hostAdapter.bridge?.workbench?.onClose(close);
+  await initBridge();
 })().catch(error => toast('JSON 工作台启动失败：' + error.message, 'error'));

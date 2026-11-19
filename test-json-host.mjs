@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import puppeteer from 'puppeteer-core';
+import { openTestBrowser } from './scripts/browser-test-support.mjs';
 import { startSidecar } from './scripts/json-test-support.mjs';
 const sidecar = await startSidecar();
-const edgePaths=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Microsoft/Edge/Application/msedge.exe'];
-let executablePath;
-for(const name of edgePaths)try{await fs.access(name);executablePath=name;break;}catch{}
-const browser=await puppeteer.launch({executablePath,headless:true});
+const browser=await openTestBrowser();
 let count=0, saveResult={saved:true}, downloads=[], savedSessions=0;
 const settings=new Map([['cc-toolbox-split','46%']]);
 try {

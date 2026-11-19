@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test-grid.mjs && node test-json-core.mjs",
+    "test": "node test-grid.mjs && node test-json-core.mjs && node test-xml.mjs",
     "test:ui": "node test-ui.mjs",
+    "test:route-b": "node test-route-b.mjs",
     "test:json:sidecar": "dotnet build sidecar/InvoiceSidecarNoWf -c Release && node test-json-sidecar.mjs",
     "test:json:host": "dotnet build sidecar/InvoiceSidecarNoWf -c Release && node test-json-host.mjs"
   }

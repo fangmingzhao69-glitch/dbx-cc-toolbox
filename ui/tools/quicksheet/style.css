@@ -1,0 +1,6 @@
+.sheet-columns { padding: 8px; display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; }
+.sheet-col { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.sheet-col input, .sheet-col select {
+  font-size: 14px; padding: 4px 6px; border: 1px solid var(--border-strong);
+  border-radius: 6px; background: var(--bg); color: #000;
+}

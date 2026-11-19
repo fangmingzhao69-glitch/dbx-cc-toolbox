@@ -1,3 +1,5 @@
+import template from './template.js';
+
 const templateKey = 'cc-toolbox-invoice-templates';
 const historyKey = 'cc-toolbox-invoice-history';
 const supported = /\.(pdf|png|jpe?g|bmp|tiff?|gif|ico)$/i;
@@ -15,12 +17,12 @@ function base64(bytes) {
   return btoa(text);
 }
 
-export function initInvoice(notify) {
-  const get = name => document.getElementById('inv-' + name);
+export default function mount({ toast: notify, bridge, preferences }, panel) {
+  panel.innerHTML = template;
+  const get = name => panel.querySelector('#inv-' + name);
   const list = get('list');
-  if (!list) return;
-  const bridge = window.dbxPlugin;
   let workspace;
+  let closing = false;
   let files = [];
   let activeId;
   let mode = 'sheet';
@@ -30,7 +32,6 @@ export function initInvoice(notify) {
   let job;
   let jobTimer;
   let previewVersion = 0;
-  let preferencesQueue = Promise.resolve();
   let templates = [];
   let history = [];
   let templatesLoaded = false;
@@ -50,10 +51,16 @@ export function initInvoice(notify) {
   }
 
   async function work(method, params = {}, timeoutMs) {
+    if (closing) throw new Error('发票工作台正在关闭');
     if (!workspace) {
       const version = await invoke('version');
       if (!version.workspaces) throw new Error('请同步更新插件和发票打印侧车');
-      workspace = await invoke('workspace/open');
+      const opened = await invoke('workspace/open');
+      if (closing) {
+        await invoke('workspace/close', { workspaceId: opened.id }).catch(() => {});
+        throw new Error('发票工作台正在关闭');
+      }
+      workspace = opened;
     }
     try { return await invoke(method, { ...params, workspaceId: workspace.id }, timeoutMs); }
     catch (error) {
@@ -69,31 +76,13 @@ export function initInvoice(notify) {
     }
   }
 
-  async function preference(key, fallback) {
-    if (bridge) {
-      await bridge.ready;
-      return await bridge.storage.get(key) ?? fallback;
-    }
-    return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback;
-  }
-
-  function savePreference(key, value) {
-    const write = async () => {
-      if (bridge) await bridge.storage.set(key, value);
-      else localStorage.setItem(key, JSON.stringify(value));
-    };
-    const saved = preferencesQueue.then(write);
-    preferencesQueue = saved.catch(() => {});
-    return saved;
-  }
-
   function report(message, tone = 'info') {
     hint.textContent = message;
     notify(message, tone);
   }
 
   async function run(action, progress) {
-    if (busy) return;
+    if (busy || closing) return;
     if (!available()) { report('发票打印需要 DBX Windows x64 插件侧车', 'error'); return; }
     busy = true;
     if (progress) hint.textContent = progress;
@@ -352,17 +341,18 @@ export function initInvoice(notify) {
     if (!historyLoaded) return;
     history = [{ ...job }, ...history.filter(item => item.id !== job.id)].slice(0, 50);
     showHistory();
-    void savePreference(historyKey, history).catch(error => report('打印历史保存失败：' + describeError(error), 'error'));
+    void preferences.write(historyKey, history).catch(error => report('打印历史保存失败：' + describeError(error), 'error'));
   }
 
   function pollJob() {
     clearTimeout(jobTimer);
-    if (!job || job.terminal) return;
+    if (closing || !job || job.terminal) return;
     jobTimer = setTimeout(async () => {
       try { job = { ...job, ...await invoke('job/status', { jobId: job.id }) }; }
       catch (error) {
         job = { ...job, message: '无法查询状态，请检查系统打印队列：' + describeError(error), terminal: true };
       }
+      if (closing) return;
       showJob();
       if (job.terminal) recordJob();
       else pollJob();
@@ -437,7 +427,7 @@ export function initInvoice(notify) {
   }, '正在提交打印…'));
 
   const saveTemplates = async (next, selected) => {
-    await savePreference(templateKey, next);
+    await preferences.write(templateKey, next);
     templates = next;
     showTemplates(selected);
   };
@@ -472,9 +462,13 @@ export function initInvoice(notify) {
     report('模板已删除', 'ok');
   }));
 
-  void preference(templateKey, []).then(value => { templates = Array.isArray(value) ? value : []; templatesLoaded = true; showTemplates(); })
+  void preferences.read(templateKey, []).then(value => {
+    if (closing) return;
+    templates = Array.isArray(value) ? value : []; templatesLoaded = true; showTemplates();
+  })
     .catch(error => report('打印模板读取失败：' + describeError(error), 'error'));
-  void preference(historyKey, []).then(value => {
+  void preferences.read(historyKey, []).then(value => {
+    if (closing) return;
     history = Array.isArray(value) ? value : [];
     historyLoaded = true;
     showHistory();
@@ -483,11 +477,14 @@ export function initInvoice(notify) {
     else if (job) recordJob();
   }).catch(error => report('打印历史读取失败：' + describeError(error), 'error'));
   if (available()) {
-    bridge.workbench?.onClose(async () => {
-      clearTimeout(jobTimer);
-      if (workspace) await invoke('workspace/close', { workspaceId: workspace.id }).catch(() => {});
-    });
     void run(refreshPrinters, '正在读取打印机…');
   } else hint.textContent = '发票打印需要 DBX Windows x64 插件侧车';
   updateControls();
+  return {
+    async dispose() {
+      closing = true;
+      clearTimeout(jobTimer);
+      if (workspace) await invoke('workspace/close', { workspaceId: workspace.id });
+    },
+  };
 }

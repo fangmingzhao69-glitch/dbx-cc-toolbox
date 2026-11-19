@@ -6,14 +6,14 @@
     "name": "CC 工具箱自托管仓库",
     "homepage": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/catalog/index.json"
   },
-  "generatedAt": "2026-11-19T09:13:29.611Z",
+  "generatedAt": "2026-11-19T17:28:23.117Z",
   "plugins": [
     {
       "id": "com.cctoolbox.jsongrid",
       "name": "CC 工具箱 · JSON 解析",
       "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
       "publisher": "cctoolbox",
-      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.4/plugin.svg",
+      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.5/plugin.svg",
       "tags": [
         "json",
         "grid",
@@ -25,20 +25,20 @@
         "host.connections:read",
         "host.data:read"
       ],
-      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.4",
-      "latestVersion": "0.2.4",
+      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.5",
+      "latestVersion": "0.2.5",
       "versions": [
         {
-          "version": "0.2.4",
-          "releasedAt": "2026-11-19T09:13:29.611Z",
-          "releaseNotes": "# CC 工具箱 0.2.4\n\n本版改善 JSON 解析页的编辑和阅读体验，适用于 Windows x64。\n\n- 粘贴合法 JSON 后自动缩进并生成表格，保留大整数和指数的原始写法。可用 Ctrl+Z 撤销粘贴，非法 JSON 保留原文并显示解析错误。\n- 每个页签独立保存分割线的位置，重新打开工作台仍可恢复。双击仅重置当前页签。\n- 展开后的嵌套数组可独立滚动。点击「单独查看」可在整个右侧表格区浏览，返回时保留原表展开状态和滚动位置。\n- 表头和行号在滚动时保留可见，长文本可换行，深色主题中的表格文字使用高对比度配色。\n\n在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再从已安装插件更新 CC 工具箱。继续使用原有仓库信任设置。",
+          "version": "0.2.5",
+          "releasedAt": "2026-11-19T17:28:23.118Z",
+          "releaseNotes": "# CC 工具箱 0.2.5\n\n适用于 Windows x64。此版本实施了路线 B，将工具箱拆成由同一注册表管理的 12 个工具。工具首次打开时初始化，切换面板会保留当前内容，单个工具挂载失败时可以重试。\n\n- 新增 XML 树形查看、原文定位、格式化、校验和 CSV 导出。格式化以编辑器当前原文为准，保留混合文本与 `xml:space`，校验会报告重复属性和非法实体。解析器支持 XML 1.0，禁止 DTD。\n- CSV 按主键比对查到重复键时显示文件和行号，避免覆盖记录后误报无差异。\n- 离线枚举与正则校验可选字段，整列不符合规则时会报告每条记录。\n- 画板 PNG、CSV 差异和离线校验报告通过 DBX 保存文件接口导出。切换工具不影响发票工作区和打印状态。\n\n在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再到已安装插件更新。仍使用原有的仓库信任配置。\n\n实现依据见 [路线 B 改造与实施方案](route-b-implementation-plan.md)。",
           "artifacts": [
             {
               "target": "windows-x64",
-              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.4/com.cctoolbox.jsongrid-0.2.4-windows-x64.signed.dbxp",
-              "sha256": "cfbcc52134f2b99d7e995bf519a5aa2dc7ca41c1a43b905857fc405eef405b2e",
+              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.5/com.cctoolbox.jsongrid-0.2.5-windows-x64.signed.dbxp",
+              "sha256": "a2ab6c706d7bbe67e96fce8cb05b93117e30cbb5c019aa7f7a9f0989d920c6a3",
               "signingKeyId": "cctoolbox-local-2026",
-              "size": 37651542
+              "size": 37674802
             }
           ]
         }

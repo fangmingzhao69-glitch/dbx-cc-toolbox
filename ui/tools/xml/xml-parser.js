@@ -4,6 +4,7 @@ const namePattern = /[:A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u03
 const invalidChar = /[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/u;
 const whitespace = /^[ \r\n\t]*$/;
 const declaration = /^<\?xml[ \r\n\t]+version[ \r\n\t]*=[ \r\n\t]*(["'])1\.0\1(?:[ \r\n\t]+encoding[ \r\n\t]*=[ \r\n\t]*(["'])[A-Za-z][A-Za-z0-9._-]*\2)?(?:[ \r\n\t]+standalone[ \r\n\t]*=[ \r\n\t]*(["'])(?:yes|no)\3)?[ \r\n\t]*\?>/;
+export const MAX_XML_CHARS = 2 * 1024 * 1024;
 
 export function parseXmlDocument(input) {
   const source = String(input ?? '');
@@ -62,13 +63,15 @@ export function parseXmlDocument(input) {
     pos = end + 2;
     return addNode({ kind: 'pi', name, text, from, to: pos });
   }
-  function skipMisc() {
+  function readMisc(tokens) {
     for (;;) {
       skipWhitespace();
+      const from = pos;
       if (starts('<!--')) readDelimited('comment', '<!--', '-->');
       else if (starts('<?')) readProcessingInstruction();
       else if (starts('<!DOCTYPE')) fail('不支持 DOCTYPE 或 DTD，请移除声明');
       else return;
+      tokens.push(source.slice(from, pos));
     }
   }
 
@@ -135,20 +138,23 @@ export function parseXmlDocument(input) {
   }
 
   try {
-    if (source.length > 2 * 1024 * 1024) fail('XML 输入超过 2 Mi 字符', 0);
+    if (source.length > MAX_XML_CHARS) fail('XML 输入超过 2 Mi 字符', 0);
     const invalid = source.search(invalidChar);
     if (invalid >= 0) fail('包含 XML 1.0 不允许的字符', invalid);
+    const prolog = [];
+    const epilog = [];
     if (/^<\?xml(?=[ \r\n\t?])/.test(source.slice(bom, bom + 7))) {
       const match = source.slice(bom).match(declaration);
       if (!match) fail('XML 1.0 声明无效');
+      prolog.push(match[0]);
       pos += match[0].length;
     }
-    skipMisc();
+    readMisc(prolog);
     if (!starts('<') || starts('</')) fail('没有找到 XML 根元素');
     const root = parseElement(0);
-    skipMisc();
+    readMisc(epilog);
     if (pos < source.length) fail('根元素之后存在多余内容');
-    Object.defineProperty(root, 'source', { value: source });
+    Object.defineProperties(root, { source: { value: source }, prolog: { value: prolog }, epilog: { value: epilog } });
     return { ok: true, root, nodeCount: countNodes(root) };
   } catch (error) {
     const index = error.index ?? pos;
@@ -162,20 +168,36 @@ export function countNodes(node) {
   return node ? 1 + (node.children ?? []).reduce((sum, child) => sum + countNodes(child), 0) : 0;
 }
 
-export function formatXml(root) {
+function serializeXml(root, indent) {
   const source = root.source;
-  function format(node, depth, preserveSpace) {
-    const pad = '  '.repeat(depth);
+  const separator = indent ? '\n' : '';
+  function hasInlineSpace(node) {
+    let previousEnd = node.openEnd;
+    for (const child of node.children) {
+      // Same-line space between nodes can separate words in inline XML content.
+      if (child.from > previousEnd && !/[\r\n]/.test(source.slice(previousEnd, child.from))) return true;
+      previousEnd = child.to;
+    }
+    return node.closeStart > previousEnd && !/[\r\n]/.test(source.slice(previousEnd, node.closeStart));
+  }
+  function serialize(node, depth) {
+    const pad = indent.repeat(depth);
     const raw = source.slice(node.from, node.to);
     if (node.kind !== 'element') return pad + raw;
-    const xmlSpace = node.attrs.find(attr => attr.name === 'xml:space')?.value;
-    const preserve = xmlSpace === undefined ? preserveSpace : xmlSpace !== 'default';
-    if (preserve || !node.children.length || node.children.some(child => child.kind === 'text' || child.kind === 'cdata'))
+    if (node.attrs.some(attr => attr.name === 'xml:space' && attr.value !== 'default') ||
+      !node.children.length || node.children.some(child => child.kind === 'text' || child.kind === 'cdata') || hasInlineSpace(node)) {
       return pad + raw;
-    const children = node.children.map(child => format(child, depth + 1, preserve));
-    return [pad + source.slice(node.from, node.openEnd), ...children, pad + source.slice(node.closeStart, node.to)].join('\n');
+    }
+    const children = node.children.map(child => serialize(child, depth + 1));
+    return [pad + source.slice(node.from, node.openEnd), ...children, pad + source.slice(node.closeStart, node.to)].join(separator);
   }
-  const before = source.slice(0, root.from).trim();
-  const after = source.slice(root.to).trim();
-  return [before, format(root, 0, false), after].filter(Boolean).join('\n');
+  return [...root.prolog, serialize(root, 0), ...root.epilog].join(separator);
+}
+
+export function formatXml(root, indent = '  ') {
+  return serializeXml(root, indent);
+}
+
+export function compressXml(root) {
+  return serializeXml(root, '');
 }

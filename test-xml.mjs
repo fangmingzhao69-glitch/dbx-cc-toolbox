@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { parseXmlDocument, formatXml, countNodes } from './ui/tools/xml/xml-parser.js';
+import { parseXmlDocument, formatXml, compressXml, countNodes } from './ui/tools/xml/xml-parser.js';
+import { decodeXmlFile } from './ui/tools/xml/xml-file.js';
 
 let pass = 0, fail = 0;
 const test = (name, fn) => { try { fn(); console.log('PASS ' + name); pass++; } catch (e) { console.log('FAIL ' + name + ': ' + e.message); fail++; } };
@@ -88,6 +89,41 @@ test('限制嵌套、大小和节点数量', () => {
   assert.match(parseXmlDocument('<r>'.repeat(129) + '</r>'.repeat(129)).error.message, /128 层/);
   assert.match(parseXmlDocument('<r>' + 'x'.repeat(2 * 1024 * 1024) + '</r>').error.message, /2 Mi/);
   assert.match(parseXmlDocument('<r>' + '<n/>'.repeat(20_000) + '</r>').error.message, /20000/);
+});
+
+test('缩进选择与压缩保留 XML 声明、注释和处理指令', () => {
+  const input = '<?xml version="1.0"?>\n<!-- start -->\n<r>\n <a/>\n <?edit keep?>\n</r>\n<!-- end -->';
+  const root = parseXmlDocument(input).root;
+  assert.match(formatXml(root, '   '), /\n   <a\/>\n   <\?edit keep\?>/);
+  assert.match(formatXml(root, '\t'), /\n\t<a\/>/);
+  const compact = '<?xml version="1.0"?><!-- start --><r><a/><?edit keep?></r><!-- end -->';
+  assert.equal(compressXml(root), compact);
+  assert.ok(parseXmlDocument(compact).ok);
+});
+
+test('压缩保留混合文本、行内空格、CDATA 和 xml:space', () => {
+  const text = '<p>前 <b>粗体</b> 后</p>';
+  const inline = '<p><b>一</b> <i>二</i></p>';
+  const keep = '<x xml:space="preserve">\n  <a/>\n</x>';
+  const cdata = '<note><![CDATA[首行\n次行]]></note>';
+  const source = '<root>\n ' + [text, inline, keep, cdata].join('\n ') + '\n</root>';
+  const root = parseXmlDocument(source).root;
+  assert.equal(compressXml(root), '<root>' + text + inline + keep + cdata + '</root>');
+  assert.ok(formatXml(root, '    ').includes(inline));
+});
+
+test('按 UTF-8、UTF-16 和 GB18030 读取本地 XML 文件', () => {
+  const utf8 = '<?xml version="1.0" encoding="UTF-8"?><r>中文😀</r>';
+  assert.equal(decodeXmlFile(Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from(utf8)])), utf8);
+  const utf16 = '<?xml version="1.0" encoding="UTF-16"?><r>中文😀</r>';
+  assert.equal(decodeXmlFile(Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from(utf16, 'utf16le')])), utf16);
+  assert.equal(decodeXmlFile(Buffer.from(utf16, 'utf16le').swap16()), utf16);
+  const declared = '<?xml version="1.0" encoding="GB18030"?><r>';
+  const encoded = Buffer.concat([Buffer.from(declared), Buffer.from([0xD6, 0xD0, 0xCE, 0xC4]), Buffer.from('</r>')]);
+  assert.equal(decodeXmlFile(encoded), declared + '中文</r>');
+  assert.throws(() => decodeXmlFile(Buffer.from([0xFF, 0xFE, 0x00, 0x00])), /UTF-32/);
+  assert.throws(() => decodeXmlFile(Buffer.from([0xF0, 0x90])), /读取 XML/);
+  assert.throws(() => decodeXmlFile(Buffer.from('<?xml version="1.0" encoding="UTF-16"?><r/>')), /不一致/);
 });
 
 console.log('\nXML 解析核心：' + pass + ' 通过，' + fail + ' 失败');

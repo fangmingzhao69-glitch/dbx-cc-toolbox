@@ -1,5 +1,6 @@
 import template from './template.js';
-import { parseXmlDocument, formatXml } from './xml-parser.js';
+import { MAX_XML_CHARS, parseXmlDocument, formatXml, compressXml } from './xml-parser.js';
+import { MAX_XML_FILE_BYTES, decodeXmlFile } from './xml-file.js';
 import { rowsToCsvText } from '../../shared/csv.js';
 
 const SAMPLE = [
@@ -25,7 +26,7 @@ function exportRows(root) {
   return rowsToCsvText(rows);
 }
 
-export default function mount({ toast, saveFile }, panel) {
+export default function mount({ toast, saveFile, host }, panel) {
   panel.innerHTML = template;
   const get = id => panel.querySelector('#xml-' + id);
   const editor = get('editor');
@@ -36,6 +37,7 @@ export default function mount({ toast, saveFile }, panel) {
   let timer;
   let cachedSource;
   let parsed;
+  let revision = 0;
 
   function element(tag, className, text) {
     const node = panel.ownerDocument.createElement(tag);
@@ -148,16 +150,54 @@ export default function mount({ toast, saveFile }, panel) {
   }
 
   editor.addEventListener('input', () => {
+    revision++;
     clearTimeout(timer);
     hint.textContent = '待解析';
     timer = setTimeout(refresh, 180);
   });
-  get('sample').addEventListener('click', () => { editor.value = SAMPLE; refresh(); });
-  get('format').addEventListener('click', () => {
+  function replaceSource(text) {
+    revision++;
+    editor.value = text;
+    refresh();
+  }
+
+  function transform(operation, message) {
     const result = parseCurrent();
     if (!result.ok) { refresh(); toast('请先修正 XML 语法', 'error'); return; }
-    editor.value = formatXml(result.root);
-    refresh();
+    const text = operation(result.root);
+    if (text.length > MAX_XML_CHARS) { toast('转换结果超过 XML 编辑器大小上限', 'error'); return; }
+    replaceSource(text);
+    toast(message, 'ok');
+  }
+
+  get('sample').addEventListener('click', () => replaceSource(SAMPLE));
+  get('format').addEventListener('click', () => {
+    const choice = get('indent').value;
+    const indent = choice === 'tab' ? '\t' : ' '.repeat(Number(choice));
+    transform(root => formatXml(root, indent), 'XML 格式化完成');
+  });
+  get('compress').addEventListener('click', () => transform(compressXml, 'XML 压缩完成'));
+  get('copy').addEventListener('click', () => {
+    if (!editor.value) { toast('没有可复制的 XML', 'info'); return; }
+    void host.copyText(editor.value, toast);
+  });
+  const fileInput = get('file');
+  get('import').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    fileInput.value = '';
+    if (!file) return;
+    const request = ++revision;
+    try {
+      if (file.size > MAX_XML_FILE_BYTES) throw new Error('文件过大，请导入较小的 XML 文件');
+      const text = decodeXmlFile(await file.arrayBuffer());
+      if (request !== revision) return;
+      replaceSource(text);
+      if (parseCurrent().ok) toast('已导入 ' + file.name, 'ok');
+      else toast('已载入 ' + file.name + '，请检查 XML 解析错误', 'error');
+    } catch (error) {
+      if (request === revision) toast('导入失败：' + error.message, 'error');
+    }
   });
   get('validate').addEventListener('click', () => {
     const result = parseCurrent();
@@ -167,7 +207,7 @@ export default function mount({ toast, saveFile }, panel) {
   });
   get('expand').addEventListener('click', () => refresh(true));
   get('collapse').addEventListener('click', () => refresh());
-  get('clear').addEventListener('click', () => { editor.value = ''; refresh(); });
+  get('clear').addEventListener('click', () => replaceSource(''));
   get('export').addEventListener('click', async () => {
     const result = parseCurrent();
     if (!result.ok) { refresh(); toast('没有可导出的 XML', 'error'); return; }
@@ -177,5 +217,5 @@ export default function mount({ toast, saveFile }, panel) {
     } catch (error) { toast('导出失败：' + error.message, 'error'); }
   });
   refresh();
-  return { dispose() { clearTimeout(timer); } };
+  return { dispose() { revision++; clearTimeout(timer); } };
 }

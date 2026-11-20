@@ -11,7 +11,7 @@ const browser = await openTestBrowser();
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1500, height: 950 });
-  const errors = [], violations = [], saved = [], queries = [];
+  const errors = [], violations = [], saved = [], queries = [], copied = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => {
     if (message.text().includes('Content Security Policy')) violations.push(message.text());
@@ -24,6 +24,7 @@ try {
     queries.push(request);
     return { rows: [[7]], columns: [{ name: 'count' }], elapsedMs: 1 };
   });
+  await page.exposeFunction('testCopy', text => { copied.push(text); });
   await page.setRequestInterception(true);
   page.on('request', async request => {
     if (!request.url().startsWith(base)) return request.continue();
@@ -53,7 +54,7 @@ try {
     'capabilities:{storage:true,connectionsApi:true,dataApi:true},' +
     'storage:{get:key=>Promise.resolve(prefs.get(key)??null),set:(key,value)=>Promise.resolve(prefs.set(key,value)),delete:key=>Promise.resolve(prefs.delete(key))},' +
     'getConnections:()=>Promise.resolve([{id:"c1",name:"Test",dialect:"postgres",connected:true}]),queryData:request=>testQuery(request),' +
-    'saveFile:(info,bytes)=>testSave(info,Array.from(bytes)),workbench:{onClose:()=>{}},' +
+    'saveFile:(info,bytes)=>testSave(info,Array.from(bytes)),copy:text=>testCopy(text),workbench:{onClose:()=>{}},' +
     'invoke:async (m)=>m.endsWith("/open")?{id:"1"}:m.endsWith("/execute")?{length:4}:m.endsWith("/read")?{data:"bnVsbA==",length:4}:null};</script>';
   source = source.replace('<head>', () => '<head><base href="' + base + '"><meta http-equiv="Content-Security-Policy" content="' + policy + '">' + sdk);
   await page.setContent('<iframe sandbox="allow-scripts" style="width:1480px;height:920px"></iframe>');
@@ -61,7 +62,7 @@ try {
   const frame = await (await page.$('iframe')).contentFrame();
   await frame.waitForSelector('.side-item[data-tool=xml]');
   const show = id => frame.click('[data-tool="' + id + '"]');
-  assert.equal(await frame.$$eval('.side-item', items => items.length), 12);
+  assert.equal(await frame.$$eval('.side-item', items => items.length), 13);
   await show('xml');
   assert.equal(await frame.$eval('.xml-split', el => getComputedStyle(el).display), 'grid');
   const unchanged = await frame.evaluate(() => {
@@ -80,6 +81,48 @@ try {
   await frame.waitForFunction(() => document.querySelector('#status').textContent === '已导出 CSV');
   assert.match(saved.at(-1).data.toString(), /加粗/);
   console.log('PASS DBX CSP loads XML CSS, preserves current mixed content and exports through host');
+
+  await frame.evaluate(() => {
+    const file = document.querySelector('#xml-file');
+    const source = '<?xml version="1.0" encoding="UTF-16"?><r><a>中文</a><b/></r>';
+    const bytes = new Uint8Array(2 + 2 * source.length);
+    const view = new DataView(bytes.buffer);
+    view.setUint16(0, 0xFEFF, true);
+    for (let i = 0; i < source.length; i++) view.setUint16(2 + i * 2, source.charCodeAt(i), true);
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], 'input.xml', { type: 'application/xml' }));
+    file.files = transfer.files;
+    file.dispatchEvent(new Event('change'));
+  });
+  await frame.waitForFunction(() => document.querySelector('#xml-editor').value.includes('<a>中文</a>'));
+  await frame.select('#xml-indent', 'tab');
+  await frame.click('#xml-format');
+  assert.match(await frame.$eval('#xml-editor', el => el.value), /\n\t<a>中文<\/a>\n\t<b\/>/);
+  await frame.click('#xml-compress');
+  const compressed = '<?xml version="1.0" encoding="UTF-16"?><r><a>中文</a><b/></r>';
+  assert.equal(await frame.$eval('#xml-editor', el => el.value), compressed);
+  await frame.click('#xml-copy');
+  await frame.waitForFunction(() => document.querySelector('#status').textContent === '已复制到剪贴板');
+  assert.equal(copied.at(-1), compressed);
+  console.log('PASS XML imports UTF-16 files, formats with chosen indentation, compresses and copies');
+
+  await show('escape');
+  assert.equal(await frame.$eval('.escape-workspace', el => getComputedStyle(el).display), 'grid');
+  await frame.$eval('#escape-input', el => { el.value = '中😀 é +%'; });
+  await frame.click('#escape-encode');
+  assert.equal(await frame.$eval('#escape-output', el => el.value), '%u4E2D%uD83D%uDE00%20%E9%20+%25');
+  await frame.click('#escape-reuse');
+  await frame.click('#escape-decode');
+  assert.equal(await frame.$eval('#escape-output', el => el.value), '中😀 é +%');
+  await frame.click('#escape-copy');
+  await frame.waitForFunction(() => document.querySelector('#status').textContent === '已复制到剪贴板');
+  assert.equal(copied.at(-1), '中😀 é +%');
+  await show('json');
+  await show('escape');
+  assert.equal(await frame.$eval('#escape-output', el => el.value), '中😀 é +%');
+  await frame.click('#escape-clear');
+  assert.ok(await frame.$eval('#escape-copy', el => el.disabled));
+  console.log('PASS Escape tools round-trip and copy Unicode text in the DBX sandbox');
 
   await show('drawboard');
   await frame.$eval('#draw-canvas', canvas => {

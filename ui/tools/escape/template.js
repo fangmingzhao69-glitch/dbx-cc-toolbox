@@ -1,0 +1,16 @@
+export default [
+  '<header class="tool-head"><span>Escape 编解码</span><span class="hint" id="escape-hint" role="status">兼容 %XX 和 %uXXXX 转义</span></header>',
+  '<div class="tool-actions">',
+  '<button type="button" id="escape-encode">Escape 编码</button>',
+  '<button type="button" id="escape-decode">UnEscape 解码</button>',
+  '<button type="button" id="escape-reuse" disabled>结果转为输入</button>',
+  '<button type="button" id="escape-copy" disabled>复制结果</button>',
+  '<button type="button" id="escape-clear">清空</button>',
+  '</div>',
+  '<div class="escape-workspace">',
+  '<section class="pane"><label class="pane-head" for="escape-input">输入</label>',
+  '<textarea id="escape-input" spellcheck="false" placeholder="粘贴文本或 Escape 编码"></textarea></section>',
+  '<section class="pane"><label class="pane-head" for="escape-output">结果</label>',
+  '<textarea id="escape-output" spellcheck="false" readonly></textarea></section>',
+  '</div>',
+].join('\n');

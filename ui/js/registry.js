@@ -1,4 +1,5 @@
 import mountXml from '../tools/xml/index.js';
+import mountEscape from '../tools/escape/index.js';
 import mountCsvViewer from '../tools/csvviewer/index.js';
 import mountJsonDiff from '../tools/jsondiff/index.js';
 import mountCsvCompare from '../tools/csvcompare/index.js';
@@ -20,6 +21,7 @@ export const toolGroups = [
     { id: 'jsondiff', title: 'JSON 内容比对', mount: mountJsonDiff },
     { id: 'csvcompare', title: 'CSV 内容比对', mount: mountCsvCompare },
   ] },
+  { label: '编码转换', tools: [{ id: 'escape', title: 'Escape 编解码', mount: mountEscape }] },
   { label: '数据处理', tools: [
     { id: 'home', title: '首页数据概览', mount: mountHome },
     { id: 'import', title: '临时数据建表', mount: mountImport },

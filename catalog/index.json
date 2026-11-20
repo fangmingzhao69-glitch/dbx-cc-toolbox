@@ -6,14 +6,14 @@
     "name": "CC 工具箱自托管仓库",
     "homepage": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/catalog/index.json"
   },
-  "generatedAt": "2026-11-20T16:46:09.165Z",
+  "generatedAt": "2026-11-20T17:12:38.620Z",
   "plugins": [
     {
       "id": "com.cctoolbox.jsongrid",
       "name": "CC 工具箱 · JSON 解析",
       "description": "在 DBX 工作台里直接解析 JSON：树形/表格视图、嵌套展开、格式化、高级筛选、导出。",
       "publisher": "cctoolbox",
-      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.6/plugin.svg",
+      "icon": "https://fangmingzhao69-glitch.github.io/dbx-cc-toolbox/plugins/com.cctoolbox.jsongrid/0.2.7/plugin.svg",
       "tags": [
         "json",
         "grid",
@@ -25,20 +25,20 @@
         "host.connections:read",
         "host.data:read"
       ],
-      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.6",
-      "latestVersion": "0.2.6",
+      "source": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/tree/v0.2.7",
+      "latestVersion": "0.2.7",
       "versions": [
         {
-          "version": "0.2.6",
-          "releasedAt": "2026-11-20T16:46:09.165Z",
-          "releaseNotes": "# CC 工具箱 0.2.6\n\n适用于 Windows x64。本版增加两组本地文本处理功能。\n\n- 「编码转换」新增 Escape 编解码，兼容 JavaScript Escape 和 UnEscape 的 `%XX` 与 `%uXXXX` 写法。结果可复制，也可移回输入区继续转换。\n- 「XML 数据解析」新增本地文件导入、压缩和复制 XML。格式化支持 2、3、4 个空格或 Tab。文件导入支持 UTF-8、UTF-16 和有相应声明的 GB 系列编码。\n- XML 格式化与压缩保留混合文本、相邻节点间的行内空格、CDATA 和 `xml:space=\"preserve\"`。遇到无法读取或解析的文件时，界面会给出错误。\n\n参考功能来自 [站长工具 Escape](https://tool.chinaz.com/Tools/escape.aspx) 和 [菜鸟工具 XML 格式化](https://www.jyshare.com/front-end/710/)。操作在 DBX 插件内完成。\n\n在 DBX 的插件仓库设置中刷新 `cctoolbox.local`，再到已安装插件更新。继续使用原仓库信任配置。",
+          "version": "0.2.7",
+          "releasedAt": "2026-11-20T17:12:38.620Z",
+          "releaseNotes": "# CC 工具箱 0.2.7\n\n本版改善常用交互，并修复可能造成误判、精度丢失或覆盖编辑内容的问题。适用于 Windows x64。\n\n- 侧边栏可查找工具。在工作台内用 Ctrl+Shift+K 定位搜索框，Enter 打开首个匹配项。\n- CSV/TSV 预览可搜索全部数据并翻页，保留原始行号。比对支持共同表头选主键、增删列差异和仅看差异。重复或空主键、错误引号及列数不一致会明确报错。\n- JSON 内容比对保留大整数精度并比较深层字段，区分结构差异与原文行差异。可以在比对输入区按 Ctrl+Enter 开始比对。\n- SQL 导入保留大整数、长小数和 CSV 前导零。在目标数据库不能准确表示数值时，生成文本列以保留原始数据。支持解析同表、同字段的多条 INSERT，快速建表生成单一复合主键约束。\n- 修改输入后旧 SQL、校验结果和 CSV 差异不再可复制或导出。在线校验支持刷新连接，按生成的查询逐项执行。\n- DBX 送来新 JSON 时，已有内容留在原页签，新内容进入单独的「DBX 上下文」页签。\n\n在 DBX 插件中心刷新 `cctoolbox.local`，再到已安装插件更新，原仓库信任设置继续适用。",
           "artifacts": [
             {
               "target": "windows-x64",
-              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.6/com.cctoolbox.jsongrid-0.2.6-windows-x64.signed.dbxp",
-              "sha256": "08781ca2680235c1c4a42a02d49530c3aee1dc4d7bcc80f83ed790623d4f2e00",
+              "url": "https://github.com/fangmingzhao69-glitch/dbx-cc-toolbox/releases/download/repo-v0.2.7/com.cctoolbox.jsongrid-0.2.7-windows-x64.signed.dbxp",
+              "sha256": "d5c45193787cdf703c934b8b215b419ed8f7434115cd9369a7659775a57748ae",
               "signingKeyId": "cctoolbox-local-2026",
-              "size": 37679508
+              "size": 37688276
             }
           ]
         }

@@ -1,7 +1,8 @@
 export default `
 <div class="tool-head"><span>临时数据建表</span><span class="hint" id="import-hint">粘贴 JSON / CSV，生成建表与插入 SQL</span></div>
 <div class="tool-actions">
-  <input type="file" id="import-file" accept=".csv,.xlsx,.xls,text/csv" title="导入 CSV / Excel 文件" />
+  <input type="file" id="import-file" accept=".csv,.tsv,.json,.xlsx,.xls,text/csv" title="导入 CSV、TSV、JSON 或 Excel 文件" />
+  <label>数据格式 <select id="import-format"><option value="">自动识别</option><option>csv</option><option>tsv</option><option>json</option></select></label>
   <input id="import-table" placeholder="表名（如 tmp_orders）" value="tmp_data" />
   <select id="import-dialect">
     <option value="postgres">PostgreSQL</option>

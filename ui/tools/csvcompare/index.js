@@ -1,141 +1,147 @@
 import { escapeHtml } from '../../js/json-grid.js';
-import { parseCsv } from '../../shared/csv.js';
-
+import { csvTable, readCsvFile, rowsToCsvText } from '../../shared/csv.js';
 import template from './template.js';
 
-function indexRows(rows, indexes) {
+const displayLimit = 500;
+const label = { added: '新增', removed: '删除', changed: '修改', same: '相同', 'column-added': '新增列', 'column-removed': '删除列' };
+
+function indexRows(rows, indexes, side) {
   const indexed = new Map();
-  for (const [position, row] of rows.entries()) {
+  for (const [index, row] of rows.entries()) {
     const values = indexes.map(index => row[index]);
+    if (values.some(value => value.trim() === '')) throw new Error(side + ' 文件第 ' + (index + 1) + ' 条数据的主键为空');
     const key = JSON.stringify(values);
     const previous = indexed.get(key);
-    if (previous) return { duplicate: { values, first: previous.position, last: position + 1 } };
-    indexed.set(key, { row, position: position + 1 });
+    if (previous) throw new Error(side + ' 文件存在重复主键 ' + key + '（第 ' + previous.position + '、' + (index + 1) + ' 条数据）');
+    indexed.set(key, { row, position: index + 1 });
   }
-  return { indexed };
+  return indexed;
 }
 
-function initCsvCompare(panel, notify, saveFile) {
-  const get = id => panel.querySelector('#' + id);
-  const resultHost = get('cmp-result');
-  const summary = get('cmp-summary');
-  const hint = get('cmp-hint');
-  if (!resultHost) return;
-  const state = { a: null, b: null, nameA: '', nameB: '' };
-  let differences = [];
-
-  const readFile = async (inputId, key) => {
-    const input = get(inputId);
-    const file = input.files && input.files[0];
-    if (!file) return;
-    const rows = parseCsv(await file.text());
-    state[key] = rows;
-    state[key === 'a' ? 'nameA' : 'nameB'] = file.name;
-    hint.textContent = 'A：' + (state.nameA || '-') + '（' + (state.a ? state.a.length - 1 : 0) + ' 行） · B：' +
-      (state.nameB || '-') + '（' + (state.b ? state.b.length - 1 : 0) + ' 行）';
-    notify('已载入 ' + file.name, 'ok');
-  };
-  get('cmp-file-a')?.addEventListener('change', () => readFile('cmp-file-a', 'a'));
-  get('cmp-file-b')?.addEventListener('change', () => readFile('cmp-file-b', 'b'));
-
-  const run = () => {
-    differences = [];
-    if (!state.a || !state.b) { notify('请先选择 A、B 两个 CSV 文件', 'error'); return; }
-    const headersA = (state.a[0] || []).map((name) => name.trim());
-    const headersB = (state.b[0] || []).map((name) => name.trim());
-    const common = headersA.filter((name) => headersB.includes(name));
-    if (!common.length) { notify('两个 CSV 没有同名字段，无法比对', 'error'); return; }
-    const keyNames = get('cmp-keys').value.split(',').map((name) => name.trim()).filter(Boolean);
-    const keyIndexesA = keyNames.map((name) => headersA.indexOf(name));
-    const keyIndexesB = keyNames.map((name) => headersB.indexOf(name));
-    if (keyNames.length && (keyIndexesA.includes(-1) || keyIndexesB.includes(-1))) {
-      notify('主键列在 A 或 B 中不存在', 'error');
-      return;
+export function compareCsv(first, second, keys) {
+  const indexesA = new Map(first.columns.map((column, index) => [column, index]));
+  const indexesB = new Map(second.columns.map((column, index) => [column, index]));
+  if (keys.some(key => !indexesA.has(key) || !indexesB.has(key))) throw new Error('主键列必须同时存在于 A 和 B');
+  const common = first.columns.filter(column => indexesB.has(column));
+  const schema = second.columns.filter(column => !indexesA.has(column)).map(key => ({ status: 'column-added', key, detail: '仅 B 含此列' }))
+    .concat(first.columns.filter(column => !indexesB.has(column)).map(key => ({ status: 'column-removed', key, detail: '仅 A 含此列' })));
+  const rows = [];
+  function append(a, b, key) {
+    if (!b) rows.push({ status: 'removed', key, detail: 'B 中不存在该行' });
+    else if (!a) rows.push({ status: 'added', key, detail: 'A 中不存在该行' });
+    else {
+      const changes = common.flatMap(name => {
+        const before = a[indexesA.get(name)], after = b[indexesB.get(name)];
+        return before === after ? [] : [name + ': ' + JSON.stringify(before) + ' → ' + JSON.stringify(after)];
+      });
+      rows.push({ status: changes.length ? 'changed' : 'same', key, detail: changes.join('；') });
     }
-    const rowsA = state.a.slice(1);
-    const rowsB = state.b.slice(1);
-    const rows = [];
-    const commonA = common.map((name) => headersA.indexOf(name));
-    const commonB = common.map((name) => headersB.indexOf(name));
-
-    if (keyNames.length) {
-      const first = indexRows(rowsA, keyIndexesA);
-      const second = indexRows(rowsB, keyIndexesB);
-      const duplicate = first.duplicate || second.duplicate;
-      if (duplicate) {
-        summary.textContent = (first.duplicate ? 'A' : 'B') + ' 文件存在重复主键 ' + JSON.stringify(duplicate.values) +
-          '（第 ' + duplicate.first + '、' + duplicate.last + ' 条数据），请修改主键列或先去重';
-        resultHost.replaceChildren();
-        notify('发现重复主键，无法按主键比对', 'error');
-        return;
-      }
-      const mapA = first.indexed;
-      const mapB = second.indexed;
-      const keys = Array.from(new Set(Array.from(mapA.keys()).concat(Array.from(mapB.keys()))));
-      for (const key of keys) {
-        const rowA = mapA.get(key)?.row;
-        const rowB = mapB.get(key)?.row;
-        const keyText = JSON.parse(key).join(', ');
-        if (!rowB) { rows.push({ status: 'removed', key: keyText, detail: 'B 中不存在该行' }); continue; }
-        if (!rowA) { rows.push({ status: 'added', key: keyText, detail: 'A 中不存在该行' }); continue; }
-        const changes = [];
-        common.forEach((name, index) => {
-          const va = rowA[commonA[index]];
-          const vb = rowB[commonB[index]];
-          if (String(va) !== String(vb)) changes.push(name + ': ' + va + ' → ' + vb);
-        });
-        rows.push(changes.length ? { status: 'changed', key: keyText, detail: changes.join('；') } : { status: 'same', key: keyText, detail: '' });
-      }
-    } else {
-      const length = Math.max(rowsA.length, rowsB.length);
-      for (let index = 0; index < length; index += 1) {
-        const rowA = rowsA[index];
-        const rowB = rowsB[index];
-        const keyText = '第 ' + (index + 1) + ' 行';
-        if (!rowB) { rows.push({ status: 'removed', key: keyText, detail: 'B 中不存在' }); continue; }
-        if (!rowA) { rows.push({ status: 'added', key: keyText, detail: 'A 中不存在' }); continue; }
-        const changes = [];
-        common.forEach((name, columnIndex) => {
-          const va = rowA[commonA[columnIndex]];
-          const vb = rowB[commonB[columnIndex]];
-          if (String(va) !== String(vb)) changes.push(name + ': ' + va + ' → ' + vb);
-        });
-        rows.push(changes.length ? { status: 'changed', key: keyText, detail: changes.join('；') } : { status: 'same', key: keyText, detail: '' });
-      }
-    }
-
-    const added = rows.filter((row) => row.status === 'added').length;
-    const removed = rows.filter((row) => row.status === 'removed').length;
-    const changed = rows.filter((row) => row.status === 'changed').length;
-    const same = rows.filter((row) => row.status === 'same').length;
-    differences = rows.filter((row) => row.status !== 'same');
-    summary.textContent = 'A 与 B：新增 ' + added + ' 行，删除 ' + removed + ' 行，修改 ' + changed + ' 行，相同 ' + same + ' 行';
-    const label = { added: '新增', removed: '删除', changed: '修改', same: '相同' };
-    resultHost.innerHTML = '<table class="jgrid objarray" style="width:max-content;min-width:100%"><thead><tr><th>状态</th><th>行/主键</th><th>差异内容</th></tr></thead><tbody>' +
-      rows.slice(0, 500).map((row) => '<tr class="row"><td class="val">' + label[row.status] + '</td><td class="val">' + escapeHtml(row.key) + '</td><td class="val">' + escapeHtml(row.detail) + '</td></tr>').join('') +
-      '</tbody></table>' + (rows.length > 500 ? '<div class="tool-empty">仅显示前 500 行差异</div>' : '');
-    notify('比对完成：' + differences.length + ' 处差异', 'ok');
-  };
-
-  get('cmp-run')?.addEventListener('click', run);
-  get('cmp-swap')?.addEventListener('click', () => {
-    const tempRows = state.a; state.a = state.b; state.b = tempRows;
-    const tempName = state.nameA; state.nameA = state.nameB; state.nameB = tempName;
-    hint.textContent = 'A：' + (state.nameA || '-') + ' · B：' + (state.nameB || '-');
-    if (state.a && state.b) run();
-  });
-  get('cmp-export')?.addEventListener('click', async () => {
-    if (!differences.length) { notify('没有差异可导出', 'error'); return; }
-    const csv = '\uFEFF状态,行或主键,差异内容\r\n' + differences.map((row) =>
-      '"' + row.status + '","' + row.key.replace(/"/g, '""') + '","' + row.detail.replace(/"/g, '""') + '"').join('\r\n');
-    try {
-      const saved = await saveFile('csv-diff-' + Date.now() + '.csv', 'text/csv;charset=utf-8', csv);
-      notify(saved ? '差异 CSV 已导出' : '已取消导出', saved ? 'ok' : 'info');
-    } catch (error) { notify('导出失败：' + error.message, 'error'); }
-  });
+  }
+  if (keys.length) {
+    const a = indexRows(first.rows, keys.map(key => indexesA.get(key)), 'A');
+    const b = indexRows(second.rows, keys.map(key => indexesB.get(key)), 'B');
+    for (const key of new Set([...a.keys(), ...b.keys()])) append(a.get(key)?.row, b.get(key)?.row, JSON.parse(key).join(', '));
+  } else {
+    for (let i = 0; i < Math.max(first.rows.length, second.rows.length); i++) append(first.rows[i], second.rows[i], '第 ' + (i + 1) + ' 行');
+  }
+  return { rows, schema };
 }
 
-export default function mount(ctx, panel) {
+export default function mount({ toast, saveFile }, panel) {
   panel.innerHTML = template;
-  return initCsvCompare(panel, ctx.toast, ctx.saveFile);
+  const get = name => panel.querySelector('#cmp-' + name);
+  const host = get('result'), summary = get('summary'), hint = get('hint');
+  const keys = get('keys'), keyPicker = get('key-picker'), only = get('only-changes');
+  const files = { a: null, b: null };
+  const revision = { a: 0, b: 0 };
+  const loading = new Set();
+  let result;
+
+  function invalidate() {
+    result = null;
+    summary.textContent = '';
+    host.textContent = '请选择 A、B 文件并开始比对';
+    get('export').disabled = true;
+  }
+  function refreshFiles() {
+    hint.textContent = ['a', 'b'].map(side => side.toUpperCase() + '：' + (loading.has(side) ? '读取中…' : files[side]?.name || '-')).join(' · ');
+    get('run').disabled = !!loading.size || !files.a || !files.b;
+    get('swap').disabled = !!loading.size || (!files.a && !files.b);
+    const common = files.a?.columns.filter(column => files.b?.columns.includes(column) && !column.includes(',')) ?? [];
+    keyPicker.replaceChildren(new Option('添加主键列…', ''), ...common.map(column => new Option(column, column)));
+    keyPicker.disabled = !common.length;
+  }
+  const keyList = () => [...new Set(keys.value.split(',').map(key => key.trim()).filter(Boolean))];
+  keyPicker.addEventListener('change', () => {
+    if (keyPicker.value) keys.value = [...new Set([...keyList(), keyPicker.value])].join(', ');
+    keyPicker.value = '';
+    invalidate();
+  });
+  keys.addEventListener('input', invalidate);
+  for (const side of ['a', 'b']) {
+    const input = get('file-' + side);
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      input.value = '';
+      if (!file) return;
+      const request = ++revision[side];
+      files[side] = null;
+      loading.add(side);
+      invalidate();
+      refreshFiles();
+      try {
+        const { text, separator } = await readCsvFile(file);
+        if (request !== revision[side]) return;
+        files[side] = { ...csvTable(text, separator), name: file.name };
+        toast('已载入 ' + file.name, 'ok');
+      } catch (error) {
+        if (request === revision[side]) { host.textContent = error.message; toast('读取失败：' + error.message, 'error'); }
+      } finally {
+        if (request === revision[side]) { loading.delete(side); refreshFiles(); }
+      }
+    });
+  }
+
+  function render() {
+    if (!result) return;
+    const { rows, schema } = result;
+    const count = state => rows.filter(row => row.status === state).length;
+    summary.textContent = 'A 与 B：新增 ' + count('added') + ' 行，删除 ' + count('removed') + ' 行，修改 ' + count('changed') +
+      ' 行，相同 ' + count('same') + ' 行；新增列 ' + schema.filter(item => item.status === 'column-added').length +
+      ' 个，删除列 ' + schema.filter(item => item.status === 'column-removed').length + ' 个';
+    const shown = [...schema, ...(only.checked ? rows.filter(row => row.status !== 'same') : rows)];
+    host.innerHTML = shown.length ? '<table class="jgrid objarray" style="width:100%"><thead><tr><th>状态</th><th>行 / 主键 / 列</th>' +
+      '<th>差异内容</th></tr></thead><tbody>' + shown.slice(0, displayLimit).map(row =>
+        '<tr class="row"><td class="val">' + label[row.status] + '</td><td class="val">' + escapeHtml(row.key) +
+        '</td><td class="val">' + escapeHtml(row.detail.length > 500 ? row.detail.slice(0, 500) + '…' : row.detail) + '</td></tr>').join('') +
+      '</tbody></table>' : '<div class="tool-empty">没有差异</div>';
+    if (shown.length > displayLimit) host.insertAdjacentHTML('beforeend', '<div class="tool-empty">仅预览前 500 条，可导出完整差异</div>');
+    get('export').disabled = !schema.length && rows.every(row => row.status === 'same');
+  }
+  function run() {
+    invalidate();
+    if (loading.size || !files.a || !files.b) return;
+    try { result = compareCsv(files.a, files.b, keyList()); render(); }
+    catch (error) { summary.textContent = error.message; host.textContent = ''; toast(error.message, 'error'); }
+  }
+  get('run').addEventListener('click', run);
+  only.addEventListener('change', render);
+  get('swap').addEventListener('click', () => {
+    [files.a, files.b] = [files.b, files.a];
+    refreshFiles();
+    run();
+  });
+  get('export').addEventListener('click', async () => {
+    if (!result) return;
+    const changes = [...result.schema, ...result.rows.filter(row => row.status !== 'same')];
+    if (!changes.length) return;
+    const text = rowsToCsvText([['状态', '行或主键', '差异内容'], ...changes.map(row => [label[row.status], row.key, row.detail])]);
+    try {
+      const saved = await saveFile('csv-diff-' + Date.now() + '.csv', 'text/csv;charset=utf-8', '\uFEFF' + text);
+      toast(saved ? '差异 CSV 已导出' : '已取消导出', saved ? 'ok' : 'info');
+    } catch (error) { toast('导出失败：' + error.message, 'error'); }
+  });
+  invalidate();
+  refreshFiles();
+  return { dispose() { revision.a++; revision.b++; } };
 }

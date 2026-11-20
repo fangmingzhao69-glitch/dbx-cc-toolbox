@@ -37,17 +37,32 @@ export const toolGroups = [
 
 export function createToolShell({ sidebar, main, title, actions, context, groups = toolGroups }) {
   const tools = new Map();
+  const sections = [];
   const listeners = new AbortController();
   const doc = main.ownerDocument;
   let active;
   let disposing;
   const ctx = { ...context, showTool };
+  const search = doc.createElement('input');
+  search.id = 'tool-search';
+  search.type = 'search';
+  search.className = 'tool-search';
+  search.placeholder = '查找工具';
+  search.title = '按 Ctrl+Shift+K 查找工具';
+  search.setAttribute('aria-label', '查找工具');
+  const searchEmpty = doc.createElement('p');
+  searchEmpty.className = 'tool-search-empty';
+  searchEmpty.textContent = '没有匹配的工具';
+  searchEmpty.hidden = true;
+  sidebar.appendChild(search);
 
   for (const group of groups) {
     const heading = doc.createElement('div');
     heading.className = 'side-group';
     heading.textContent = group.label;
     sidebar.appendChild(heading);
+    const records = [];
+    sections.push({ label: group.label, heading, records });
     for (const tool of group.tools) {
       if (tools.has(tool.id)) throw new Error('重复的工具 ID：' + tool.id);
       const button = doc.createElement('button');
@@ -66,9 +81,54 @@ export function createToolShell({ sidebar, main, title, actions, context, groups
         panel.hidden = true;
         main.appendChild(panel);
       }
-      tools.set(tool.id, { tool, button, panel, instance: tool.mount ? null : {} });
+      const record = { tool, button, panel, instance: tool.mount ? null : {} };
+      tools.set(tool.id, record);
+      records.push(record);
     }
   }
+  sidebar.appendChild(searchEmpty);
+
+  function filterTools() {
+    const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let count = 0;
+    for (const section of sections) {
+      let visible = false;
+      for (const record of section.records) {
+        const searchable = [record.tool.title, record.tool.id, section.label].join(' ').toLowerCase();
+        record.button.hidden = !words.every(word => searchable.includes(word));
+        if (!record.button.hidden) { count++; visible = true; }
+      }
+      section.heading.hidden = !visible;
+    }
+    searchEmpty.hidden = count !== 0;
+  }
+
+  function openSearchResult(record) {
+    showTool(record.tool.id);
+    search.value = '';
+    filterTools();
+    record.button.focus({ preventScroll: true });
+  }
+  search.addEventListener('input', filterTools, { signal: listeners.signal });
+  search.addEventListener('keydown', event => {
+    if (event.isComposing) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      search.value = '';
+      filterTools();
+      active?.button.focus({ preventScroll: true });
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const first = [...tools.values()].find(record => !record.button.hidden);
+      if (first) openSearchResult(first);
+    }
+  }, { signal: listeners.signal });
+  doc.addEventListener('keydown', event => {
+    if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey || event.code !== 'KeyK') return;
+    event.preventDefault();
+    search.focus();
+    search.select();
+  }, { signal: listeners.signal });
 
   function mountError(record, error) {
     const container = doc.createElement('div');
@@ -122,7 +182,8 @@ export function createToolShell({ sidebar, main, title, actions, context, groups
 
   sidebar.addEventListener('click', event => {
     const button = event.target.closest('.side-item');
-    if (button) showTool(button.dataset.tool);
+    const record = button && tools.get(button.dataset.tool);
+    if (record) openSearchResult(record);
   }, { signal: listeners.signal });
   const saved = ctx.settings.get('cc-toolbox-tool');
   showTool(tools.has(saved) ? saved : tools.keys().next().value);

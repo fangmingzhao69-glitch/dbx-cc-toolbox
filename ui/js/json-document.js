@@ -118,7 +118,7 @@ export function toJs(node) {
   return result;
 }
 
-function decimalKey(raw) {
+export function decimalKey(raw) {
   const match = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(raw);
   if (!match || (match[4]?.length ?? 0) > 1000) return raw;
   let digits = (match[2] + (match[3] || '')).replace(/^0+/, '');

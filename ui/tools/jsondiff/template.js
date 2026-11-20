@@ -11,6 +11,7 @@ export default `
     <option value="tree">结构差异（推荐）</option>
     <option value="text">文本行差异</option>
   </select>
+  <label><input id="diff-changed-only" type="checkbox" checked disabled />文本模式仅看差异</label>
   <button id="diff-run" type="button">开始比对</button>
   <button id="diff-swap" type="button">交换两侧</button>
   <button id="diff-format" type="button">格式化两侧</button>

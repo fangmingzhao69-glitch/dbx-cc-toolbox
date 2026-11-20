@@ -1,159 +1,126 @@
+import { parseDocument, serializeNode, MAX_TEXT } from '../../js/json-document.js';
 import { escapeHtml } from '../../js/json-grid.js';
-
+import { compareJson, compareLines } from './compare.js';
 import template from './template.js';
 
-function diffLines(a, b) {
-  const left = a.split('\n');
-  const right = b.split('\n');
-  const n = left.length;
-  const m = right.length;
-  if (n * m > 4_000_000) return [{ type: 'same', text: '（内容过大，仅显示部分差异）', ln: 0 }];
-  const dir = new Uint8Array((n + 1) * (m + 1));
-  const width = m + 1;
-  for (let i = n - 1; i >= 0; i -= 1) {
-    for (let j = m - 1; j >= 0; j -= 1) {
-      const index = i * width + j;
-      if (left[i] === right[j]) dir[index] = 0;
-      else if (dir[(i + 1) * width + j] >= dir[i * width + j + 1]) dir[index] = 1;
-      else dir[index] = 2;
-    }
-  }
-  const rows = [];
-  let i = 0;
-  let j = 0;
-  while (i < n && j < m) {
-    if (left[i] === right[j]) { rows.push({ type: 'same', text: left[i], ln: i + 1 }); i += 1; j += 1; }
-    else if (dir[i * width + j] === 1) { rows.push({ type: 'del', text: left[i], ln: i + 1 }); i += 1; }
-    else { rows.push({ type: 'add', text: right[j], ln: j + 1 }); j += 1; }
-  }
-  while (i < n) { rows.push({ type: 'del', text: left[i], ln: i + 1 }); i += 1; }
-  while (j < m) { rows.push({ type: 'add', text: right[j], ln: j + 1 }); j += 1; }
-  return rows;
+const displayLimit = 2000;
+const empty = message => '<div class="tool-empty">' + escapeHtml(message) + '</div>';
+
+function previewValue(node) {
+  if (!node) return '';
+  const text = serializeNode(node);
+  return escapeHtml(text.length > 300 ? text.slice(0, 300) + '…' : text);
 }
 
-function normalizeJsonText(text) {
-  const trimmed = String(text || '').trim();
-  if (!trimmed) return { text: '', valid: true };
-  try { return { text: JSON.stringify(JSON.parse(trimmed), null, 2), valid: true }; }
-  catch (error) { return { text: text.replace(/\r\n/g, '\n'), valid: false }; }
-}
-
-function treeDiff(a, b, path, out, depth = 0) {
-  if (depth > 24 || out.length > 5000) return;
-  const kind = (value) => value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
-  const ka = kind(a);
-  const kb = kind(b);
-  if (ka !== kb) { out.push({ path, type: 'changed', old: a, new: b }); return; }
-  if (ka === 'object') {
-    const keys = Array.from(new Set(Object.keys(a).concat(Object.keys(b))));
-    for (const key of keys) {
-      const next = path ? path + '.' + key : key;
-      if (!(key in a)) out.push({ path: next, type: 'added', old: undefined, new: b[key] });
-      else if (!(key in b)) out.push({ path: next, type: 'removed', old: a[key], new: undefined });
-      else treeDiff(a[key], b[key], next, out, depth + 1);
-    }
-    return;
-  }
-  if (ka === 'array') {
-    const length = Math.max(a.length, b.length);
-    for (let index = 0; index < length; index += 1) {
-      const next = path + '[' + index + ']';
-      if (index >= a.length) out.push({ path: next, type: 'added', old: undefined, new: b[index] });
-      else if (index >= b.length) out.push({ path: next, type: 'removed', old: a[index], new: undefined });
-      else treeDiff(a[index], b[index], next, out, depth + 1);
-    }
-    return;
-  }
-  if (a !== b) out.push({ path, type: 'changed', old: a, new: b });
-}
-
-function formatTreeValue(value) {
-  if (value === undefined) return '';
-  const text = typeof value === 'string' ? value : JSON.stringify(value);
-  return escapeHtml(String(text).length > 300 ? String(text).slice(0, 300) + '…' : String(text));
-}
-
-function initJsonDiff(panel, notify) {
-  const get = id => panel.querySelector('#' + id);
-  const left = get('diff-left');
-  const right = get('diff-right');
-  const result = get('diff-result');
-  const hint = get('diff-hint');
-  const mode = get('diff-mode');
-  if (!left || !right || !result) return;
-
-  const renderTree = () => {
-    let a;
-    let b;
-    try { a = JSON.parse(left.value); } catch (error) { notify('左侧 JSON 不合法：' + error.message, 'error'); return; }
-    try { b = JSON.parse(right.value); } catch (error) { notify('右侧 JSON 不合法：' + error.message, 'error'); return; }
-    const diffs = [];
-    treeDiff(a, b, '', diffs);
-    const added = diffs.filter((item) => item.type === 'added').length;
-    const removed = diffs.filter((item) => item.type === 'removed').length;
-    const changed = diffs.filter((item) => item.type === 'changed').length;
-    if (hint) hint.textContent = '结构差异：新增 ' + added + ' · 删除 ' + removed + ' · 修改 ' + changed;
-    result.innerHTML = '<div class="diff-summary">新增 ' + added + ' 个节点，删除 ' + removed + ' 个节点，修改 ' + changed + ' 个节点</div>' +
-      diffs.map((item) => '<div class="diff-row diff-' + (item.type === 'added' ? 'add' : item.type === 'removed' ? 'del' : 'changed') + '">' +
-        '<span class="ln">' + escapeHtml(item.path || '(根)') + '</span><span>' +
-        (item.type === 'added' ? '+ ' + formatTreeValue(item.new)
-          : item.type === 'removed' ? '- ' + formatTreeValue(item.old)
-          : escapeHtml(String(item.old)) + '  →  ' + formatTreeValue(item.new)) + '</span></div>').join('') ||
-      '<div class="tool-empty">两侧 JSON 结构完全一致</div>';
-    notify('结构比对完成：' + (added + removed + changed) + ' 处差异', added + removed + changed ? 'ok' : 'info');
-  };
-
-  const renderText = () => {
-    const a = normalizeJsonText(left.value);
-    const b = normalizeJsonText(right.value);
-    const rows = diffLines(a.text, b.text);
-    const added = rows.filter((row) => row.type === 'add').length;
-    const removed = rows.filter((row) => row.type === 'del').length;
-    if (hint) hint.textContent = (a.valid && b.valid ? 'JSON 合法 · ' : '') + '新增 ' + added + ' 行 / 删除 ' + removed + ' 行';
-    result.innerHTML = '<div class="diff-summary">共 ' + rows.length + ' 行，新增 ' + added + ' 行，删除 ' + removed + ' 行</div>' +
-      rows.map((row) => '<div class="diff-row diff-' + row.type + '"><span class="ln">' + row.ln + '</span><span>' +
-        escapeHtml((row.type === 'add' ? '+ ' : row.type === 'del' ? '- ' : '  ') + row.text) + '</span></div>').join('');
-    notify('比对完成：新增 ' + added + ' 行，删除 ' + removed + ' 行', added || removed ? 'ok' : 'info');
-  };
-
-  const render = () => {
-    if (mode && mode.value === 'text') renderText();
-    else if (!left.value.trim() && !right.value.trim()) notify('请先输入或导入两侧 JSON', 'error');
-    else renderTree();
-  };
-
-  const bindFile = (inputId, textarea) => {
-    get(inputId)?.addEventListener('change', async () => {
-      const input = get(inputId);
-      const file = input.files && input.files[0];
-      if (!file) return;
-      textarea.value = await file.text();
-      notify('已导入 ' + file.name, 'ok');
-      render();
-    });
-  };
-  bindFile('diff-file-left', left);
-  bindFile('diff-file-right', right);
-
-  get('diff-run')?.addEventListener('click', render);
-  mode?.addEventListener('change', render);
-  get('diff-swap')?.addEventListener('click', () => {
-    const temp = left.value; left.value = right.value; right.value = temp; render();
-  });
-  get('diff-format')?.addEventListener('click', () => {
-    const a = normalizeJsonText(left.value);
-    const b = normalizeJsonText(right.value);
-    if (!a.valid || !b.valid) { notify('存在非法 JSON，无法格式化', 'error'); return; }
-    left.value = a.text; right.value = b.text; render();
-  });
-  get('diff-sample')?.addEventListener('click', () => {
-    left.value = JSON.stringify({ id: 1, name: 'demo', tags: ['a', 'b'], score: 60, extra: { keep: true } }, null, 2);
-    right.value = JSON.stringify({ id: 1, name: 'demo', tags: ['a', 'c'], score: 80 }, null, 2);
-    render();
-  });
-}
-
-export default function mount(ctx, panel) {
+export default function mount({ toast }, panel) {
   panel.innerHTML = template;
-  return initJsonDiff(panel, ctx.toast);
+  const get = name => panel.querySelector('#diff-' + name);
+  const left = get('left'), right = get('right'), result = get('result'), hint = get('hint');
+  const mode = get('mode'), changedOnly = get('changed-only');
+  const revisions = { left: 0, right: 0 };
+  let lastLines = null;
+
+  function invalidate() {
+    hint.textContent = '内容已更新，等待比对';
+    result.innerHTML = empty('点击「开始比对」或按 Ctrl+Enter');
+    lastLines = null;
+  }
+  function parse(value, side) {
+    const doc = parseDocument(value);
+    if (!doc.ok) throw new Error(side + ' JSON 第 ' + doc.error.line + ' 行：' + doc.error.message);
+    return doc;
+  }
+  function showLines(rows) {
+    const added = rows.filter(row => row.type === 'add').length;
+    const removed = rows.filter(row => row.type === 'del').length;
+    hint.textContent = '新增 ' + added + ' 行 / 删除 ' + removed + ' 行';
+    const visible = changedOnly.checked ? rows.filter(row => row.type !== 'same') : rows;
+    result.innerHTML = '<div class="diff-summary">' + escapeHtml(hint.textContent) + '</div>' +
+      (visible.length ? visible.slice(0, displayLimit).map(row => {
+        const marker = row.type === 'add' ? '+ ' : row.type === 'del' ? '− ' : '  ';
+        const text = row.text.length > 1000 ? row.text.slice(0, 1000) + '…' : row.text;
+        return '<div class="diff-row diff-' + row.type + '"><span class="ln">' +
+          (row.left ?? '–') + ' / ' + (row.right ?? '–') + '</span><span>' + escapeHtml(marker + text) + '</span></div>';
+      }).join('') : empty('两侧文本一致')) +
+      (visible.length > displayLimit ? empty('仅显示前 ' + displayLimit + ' 行结果') : '');
+  }
+  function render() {
+    invalidate();
+    changedOnly.disabled = mode.value !== 'text';
+    try {
+      if (!left.value.trim() && !right.value.trim()) throw new Error('请先输入或导入待比对内容');
+      if (mode.value === 'text') {
+        lastLines = compareLines(left.value, right.value);
+        if (!lastLines) throw new Error('文本差异范围过大，请缩小范围或使用结构比对');
+        showLines(lastLines);
+        return;
+      }
+      const { changes, limited } = compareJson(parse(left.value, '左侧'), parse(right.value, '右侧'));
+      const added = changes.filter(item => item.type === 'added').length;
+      const removed = changes.filter(item => item.type === 'removed').length;
+      const changed = changes.length - added - removed;
+      hint.textContent = '结构差异：新增 ' + added + ' · 删除 ' + removed + ' · 修改 ' + changed + (limited ? ' · 未全部统计' : '');
+      result.innerHTML = '<div class="diff-summary">' + escapeHtml(hint.textContent) + '</div>' +
+        (changes.length ? changes.slice(0, displayLimit).map(item => {
+          const type = item.type === 'added' ? 'add' : item.type === 'removed' ? 'del' : 'changed';
+          const before = previewValue(item.before), after = previewValue(item.after);
+          const description = type === 'add' ? '+ ' + after : type === 'del' ? '− ' + before : before + ' → ' + after;
+          return '<div class="diff-row diff-' + type + '"><span class="ln">' +
+            escapeHtml(item.path || '(根)') + '</span><span>' + description + '</span></div>';
+        }).join('') : empty('两侧结构一致')) +
+        (changes.length > displayLimit ? empty('仅显示前 ' + displayLimit + ' 条差异') : '');
+    } catch (error) {
+      hint.textContent = error.message;
+      result.innerHTML = empty(error.message);
+      toast(error.message, 'error');
+    }
+  }
+
+  for (const side of ['left', 'right']) {
+    const editor = get(side);
+    editor.addEventListener('input', () => { revisions[side]++; invalidate(); });
+    editor.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); render(); }
+    });
+    const input = get('file-' + side);
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      input.value = '';
+      if (!file) return;
+      const request = ++revisions[side];
+      try {
+        if (file.size > MAX_TEXT) throw new Error('文件超过 20 MiB，请先缩小范围');
+        const content = await file.text();
+        if (request !== revisions[side]) return;
+        editor.value = content;
+        invalidate();
+        if (left.value.trim() && right.value.trim()) render();
+        else hint.textContent = '已导入 ' + file.name + '，请选择另一侧内容';
+      } catch (error) {
+        if (request === revisions[side]) toast('导入失败：' + error.message, 'error');
+      }
+    });
+  }
+  function setBoth(a, b) {
+    revisions.left++;
+    revisions.right++;
+    left.value = a;
+    right.value = b;
+    render();
+  }
+  get('run').addEventListener('click', render);
+  mode.addEventListener('change', render);
+  changedOnly.addEventListener('change', () => { if (lastLines) showLines(lastLines); });
+  get('swap').addEventListener('click', () => setBoth(right.value, left.value));
+  get('format').addEventListener('click', () => {
+    try {
+      const format = (value, side) => value.trim() ? serializeNode(parse(value, side).root, true) : '';
+      const a = format(left.value, '左侧'), b = format(right.value, '右侧');
+      if (a.length > MAX_TEXT || b.length > MAX_TEXT) throw new Error('格式化结果超过大小限制');
+      setBoth(a, b);
+    } catch (error) { toast(error.message, 'error'); }
+  });
+  get('sample').addEventListener('click', () => setBoth(
+    JSON.stringify({ id: 1, name: 'demo', tags: ['a', 'b'], score: 60, extra: { keep: true } }, null, 2),
+    JSON.stringify({ id: 1, name: 'demo', tags: ['a', 'c'], score: 80 }, null, 2)));
 }

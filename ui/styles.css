@@ -293,6 +293,12 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .side-item:hover { background: var(--surface-alt); }
 .side-item.active { background: var(--accent); color: #fff; }
+.side-item[hidden], .side-group[hidden], .tool-search-empty[hidden], #csv-pages[hidden] { display: none; }
+.tool-search {
+  box-sizing: border-box; width: 100%; margin: 4px 0 6px; padding: 6px 8px;
+  border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--text);
+}
+.tool-search-empty { color: var(--muted); padding: 0 6px; font-size: 13px; }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .tool-pane { display: none; flex: 1; min-height: 0; flex-direction: column; }
 .tool-pane.active { display: flex; }
@@ -316,6 +322,10 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .diff-summary { margin: 4px 6px 8px; font-size: 14px; color: #000; }
 .csv-table { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
+#csv-table .jgrid { width: max-content; min-width: 100%; overflow: visible; }
+#csv-table .jgrid th, #csv-table .jgrid td { max-width: 360px; white-space: pre-wrap; overflow-wrap: anywhere; }
+#csv-table .jgrid td.rownum { position: sticky; left: 0; z-index: 1; }
+#csv-table .jgrid th.rownum { left: 0; z-index: 2; }
 /* ---------- 数据/报表工具 ---------- */
 .sql-input, .sql-output {
   margin: 8px; border: 1px solid var(--border-strong); border-radius: 8px;

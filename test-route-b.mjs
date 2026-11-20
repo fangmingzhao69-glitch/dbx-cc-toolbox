@@ -63,6 +63,55 @@ try {
   await frame.waitForSelector('.side-item[data-tool=xml]');
   const show = id => frame.click('[data-tool="' + id + '"]');
   assert.equal(await frame.$$eval('.side-item', items => items.length), 13);
+  await frame.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', {
+    code: 'KeyK', key: 'K', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true,
+  })));
+  assert.equal(await frame.evaluate(() => document.activeElement.id), 'tool-search');
+  await frame.type('#tool-search', 'CSV');
+  assert.equal(await frame.$$eval('.side-item:not([hidden])', items => items.length), 2);
+  await page.keyboard.press('Enter');
+  assert.equal(await frame.$eval('#tool-csvviewer', el => el.hidden), false);
+  await frame.evaluate(() => {
+    const csv = ['id,名称', ...Array.from({ length: 240 }, (_, i) => (i + 1) + ',第' + (i + 1) + '项'), '241,独有终点'].join('\n');
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([csv], 'preview.csv'));
+    const input = document.querySelector('#csv-file');
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('change'));
+  });
+  await frame.waitForFunction(() => document.querySelector('#csv-range').textContent.includes('241 行'));
+  await frame.click('#csv-next');
+  assert.match(await frame.$eval('#csv-range', el => el.textContent), /101–200/);
+  await frame.type('#csv-search', '独有终点');
+  await frame.waitForFunction(() => document.querySelector('#csv-table tr.row')?.textContent.includes('独有终点'));
+  assert.equal(await frame.$eval('#csv-table .row .rownum', el => el.textContent), '241');
+  console.log('PASS sidebar shortcut, keyboard search, whole-file CSV search and paging');
+
+  await show('jsondiff');
+  await frame.evaluate(() => {
+    const left = document.querySelector('#diff-left'), right = document.querySelector('#diff-right');
+    left.value = '{"id":9007199254740992}';
+    right.value = '{"id":9007199254740993}';
+    right.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }));
+  });
+  assert.match(await frame.$eval('#diff-hint', el => el.textContent), /修改 1/);
+  await frame.type('#diff-right', 'x');
+  assert.match(await frame.$eval('#diff-result', el => el.textContent), /开始比对/);
+  console.log('PASS JSON diff detects large-number changes and removes stale results after edits');
+
+  await show('import');
+  await frame.$eval('#import-source', input => { input.value = 'id,serial\n9007199254740993123,0007'; });
+  await frame.click('#import-run');
+  assert.match(await frame.$eval('#import-sql', el => el.value), /\(9007199254740993123, '0007'\)/);
+  await frame.type('#import-source', 'x');
+  assert.equal(await frame.$eval('#import-sql', el => el.value), '');
+  assert.equal(await frame.$eval('#import-copy', el => el.disabled), true);
+  await show('quicksheet');
+  await frame.click('#sheet-columns .sheet-col:nth-child(2) .col-pk');
+  await frame.click('#sheet-run');
+  assert.match(await frame.$eval('#sheet-sql', el => el.value), /PRIMARY KEY \("id", "name"\)/);
+  console.log('PASS SQL preserves exact input, clears obsolete output, and emits one composite key');
+
   await show('xml');
   assert.equal(await frame.$eval('.xml-split', el => getComputedStyle(el).display), 'grid');
   const unchanged = await frame.evaluate(() => {
@@ -154,6 +203,21 @@ try {
   await frame.click('#cmp-run');
   assert.match(await frame.$eval('#cmp-summary', e => e.textContent), /A 文件存在重复主键/);
   console.log('PASS CSV uploads persist across switches and duplicate keys cannot report a match');
+  await frame.evaluate(() => {
+    for (const [side, text] of Object.entries({ a: 'id,old\n1,a', b: 'id,new\n1,b' })) {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([text], side + '-fresh.csv'));
+      const input = document.querySelector('#cmp-file-' + side);
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change'));
+    }
+  });
+  await frame.waitForFunction(() => !document.querySelector('#cmp-run').disabled);
+  await frame.click('#cmp-run');
+  assert.match(await frame.$eval('#cmp-result', el => el.textContent), /新增列.*new.*删除列.*old/);
+  await frame.type('#cmp-keys', 'x');
+  assert.equal(await frame.$eval('#cmp-export', el => el.disabled), true);
+  console.log('PASS CSV schema differences are visible and changed keys invalidate exports');
 
   await show('validation');
   await frame.evaluate(() => {
@@ -167,6 +231,19 @@ try {
     get('offline-run').click();
   });
   assert.match(await frame.$eval('#val-offline-result .diff-summary', e => e.textContent), /发现问题 4 处/);
+  await frame.type('#val-source', 'x');
+  assert.equal(await frame.$eval('#val-offline-export', el => el.disabled), true);
+  await frame.waitForFunction(() => !!document.querySelector('#val-connection option[value=c1]'));
+  await frame.select('#val-connection', 'c1');
+  await frame.evaluate(() => {
+    document.querySelector('#val-table').value = 'public.order details';
+    document.querySelector('#val-columns').value = 'order';
+    document.querySelector('#val-enum').checked = false;
+    document.querySelector('#val-null').checked = true;
+  });
+  await frame.click('#val-run');
+  await frame.waitForFunction(() => document.querySelector('#val-result').textContent.includes('空值检查'));
+  assert.equal(queries.at(-1).sql, 'SELECT COUNT(*) AS null_count FROM "public"."order details" WHERE "order" IS NULL');
   await show('home');
   await frame.click('#home-refresh');
   await frame.waitForSelector('.home-test');

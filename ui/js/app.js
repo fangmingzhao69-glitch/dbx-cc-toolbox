@@ -111,15 +111,18 @@ function scheduleFitTables() {
 
 const MAX_COLUMN_WIDTH = 650; // 约 50 个汉字
 
+function fitNestedBox(box) {
+  if (!gridHost.clientWidth) return;
+  const parentBlock = box.parentElement.closest('.table-block');
+  const parentBox = box.parentElement.closest('.nested-box');
+  const visibleWidth = parentBox ? parentBlock.clientWidth : gridHost.clientWidth - 16;
+  box.style.width = Math.max(0, visibleWidth) + 'px';
+}
+
 function fitTables() {
   const host = gridHost;
   if (!host || !host.clientWidth) return;
-  for (const box of host.querySelectorAll('.nested-box:not([hidden])')) {
-    const parentBlock = box.parentElement.closest('.table-block');
-    const parentBox = box.parentElement.closest('.nested-box');
-    const visibleWidth = parentBox ? parentBlock.clientWidth : host.clientWidth - 16;
-    box.style.width = Math.max(0, visibleWidth) + 'px';
-  }
+  for (const box of host.querySelectorAll('.nested-box:not([hidden])')) fitNestedBox(box);
   host.querySelectorAll('table.jgrid').forEach((table) => {
     // 只取当前表格自己的列，避免把嵌套表格的列也算进来
     const colgroup = table.querySelector(':scope > colgroup');
@@ -330,11 +333,20 @@ function activateTab(id, options = {}) {
   }; restore(); requestAnimationFrame(restore); saveTabs();
 }
 
-function addTab(text, title) {
+const MAX_TABS = 50;
+
+function addTab(text, title, { activate = true } = {}) {
+  if (state.tabs.length >= MAX_TABS) {
+    toast('最多保留 ' + MAX_TABS + ' 个解析页签，请先关闭不用的页签', 'error');
+    return null;
+  }
   saveActiveState();
   const id = 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-  state.tabs.push({ id, title: title || ('解析 ' + (state.tabs.length + 1)), text: text || '' });
-  activateTab(id, { saveCurrent: false });
+  const tab = { id, title: title || ('解析 ' + (state.tabs.length + 1)), text: text || '' };
+  state.tabs.push(tab);
+  if (activate) activateTab(id, { saveCurrent: false });
+  else { renderTabs(); saveTabs(); }
+  return tab;
 }
 
 function closeTab(id) {
@@ -579,6 +591,10 @@ gridHost.addEventListener('click', event => {
       model.view.expanded.delete(id);
     }
     model.setExpanded(toggle, box, opened);
+    if (opened) {
+      fitNestedBox(box);
+      for (const child of box.querySelectorAll('.nested-box:not([hidden])')) fitNestedBox(child);
+    }
     scheduleFitTables();
     const rememberExpansion = () => {
       saveActiveState();
@@ -727,24 +743,40 @@ window.addEventListener('resize', () => {
 });
 
 // ---------- 与 DBX Host 集成 ----------
-async function initBridge() {
+async function initBridge(freshSession) {
   if (!window.dbxPlugin || !window.dbxPlugin.ready) return;
   try {
     await window.dbxPlugin.ready;
     const theme = window.dbxPlugin.theme;
     if (theme && theme.appearance === 'dark') applyTheme('dark');
-    const context = window.dbxPlugin.context;
-    const fromContext = extractJsonFromContext(context);
-    if (fromContext !== undefined) {
-      setEditorText(fromContext);
-      toast('已从 DBX 上下文载入 JSON', 'ok');
-    }
-    if (window.dbxPlugin.onContext) {
-      window.dbxPlugin.onContext((next) => {
-        const data = extractJsonFromContext(next);
-        if (data !== undefined) setEditorText(data);
-      });
-    }
+    let inbox, inboxText;
+    const receive = (context, initial = false) => {
+      const text = extractJsonFromContext(context);
+      if (text === undefined || state.tabs.some(tab => tab.text === text)) return;
+      if (text.length > MAX_TEXT) { toast('DBX 上下文超过 JSON 编辑器大小上限', 'error'); return; }
+      const active = currentTab();
+      if (!editor.value.trim() || (initial && freshSession && state.tabs.length === 1 && !active?.revision)) {
+        setEditorText(text);
+        toast('已从 DBX 上下文载入 JSON', 'ok');
+        return;
+      }
+      // Reuse an untouched background inbox, never an open document or a user's edit.
+      if (inbox && state.tabs.includes(inbox) && inbox !== active && inbox.text === inboxText) {
+        Object.assign(inbox, { text, parser: null, filtered: null, view: {}, editorScrollTop: 0, editorSelection: null,
+          gridScrollTop: 0, gridScrollLeft: 0 });
+        inboxText = text;
+        saveTabs();
+        toast('已更新「DBX 上下文」页签', 'ok');
+        return;
+      }
+      inbox = addTab(text, 'DBX 上下文', { activate: false });
+      if (inbox) {
+        inboxText = text;
+        toast('已将 DBX 上下文载入独立页签', 'ok');
+      }
+    };
+    receive(window.dbxPlugin.context, true);
+    window.dbxPlugin.onContext?.(next => receive(next));
   } catch (error) {
     // 非 DBX 环境（浏览器直接打开）忽略
   }
@@ -797,5 +829,5 @@ function extractJsonFromContext(context) {
   };
   window.addEventListener('pagehide', () => { void close().catch(() => {}); });
   hostAdapter.bridge?.workbench?.onClose(close);
-  await initBridge();
+  await initBridge(!stored?.tabs?.length);
 })().catch(error => toast('JSON 工作台启动失败：' + error.message, 'error'));

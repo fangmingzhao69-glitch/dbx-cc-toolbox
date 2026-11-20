@@ -52,6 +52,26 @@ try {
    assert.deepEqual(await frame.evaluate(()=>window.__sandboxCheck),['SecurityError','EvalError']);
    assert.ok(await frame.$('table.jgrid'));
  });
+ await check('receiving DBX context preserves the open editor and updates an untouched inbox', async () => {
+   await frame.waitForFunction(() => window.__contextListeners.length > 0);
+   const value = '{"draft":"用户正在编辑"}';
+   await load(value);
+   const original = await frame.$eval('.tab.active', tab => tab.dataset.tabId);
+   await frame.evaluate(() => {
+     for (const listen of window.__contextListeners) {
+       listen({ json: '{"first":1}' });
+       listen({ json: '{"received":9007199254740993}' });
+     }
+   });
+   assert.equal(await frame.$eval('#editor', el => el.value), value);
+   const contexts = await frame.$$('.tab[data-tab-id] .tab-title');
+   assert.equal(contexts.length, 2);
+   await contexts[1].click();
+   assert.equal(await frame.$eval('#editor', el => el.value), '{"received":9007199254740993}');
+   await frame.click('.tab[data-tab-id="' + original + '"]');
+   assert.equal(await frame.$eval('#editor', el => el.value), value);
+   await frame.click('.tab:not(.active) .tab-close');
+ });
  await check('paste formats valid JSON immediately without changing numeric tokens', async () => {
    const raw = '{"id":9007199254740993,"items":[1e400,{"text":"中文😀"}]}';
    await load('{"old":1}');

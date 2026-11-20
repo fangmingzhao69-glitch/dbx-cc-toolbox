@@ -1,5 +1,5 @@
 import { escapeHtml } from '../../js/json-grid.js';
-import { sqlString, parseInsertSql, dataRowsFromText } from '../../shared/sql.js';
+import { dataRowsFromText, parseInsertSql, quoteQualifiedIdent, sqlString } from '../../shared/sql.js';
 
 import template from './template.js';
 
@@ -9,79 +9,120 @@ function initValidation(panel, notify, toolHost) {
   const output = get('val-sql');
   if (!select || !output) return;
   let loaded = false;
+  let loading;
+  let activeRun = 0;
+  const copy = get('val-copy');
+  const run = get('val-run');
+  const results = get('val-result');
+  const refresh = get('val-refresh');
 
-  const ensure = async () => {
-    if (loaded) return;
-    const connections = await toolHost.loadConnections(notify);
-    if (connections === null) return;
-    select.replaceChildren(new Option('选择连接…', ''), ...connections.map(connection => {
-      const status = connection.connected ? '已连接' : '未连接';
-      return new Option(connection.name + ' (' + (connection.dialect || connection.dbType || '') + ' · ' + status + ')', connection.id);
-    }));
-    loaded = true;
+  const ensure = (force = false, quiet = false) => {
+    if (loading) return loading;
+    if (loaded && !force) return Promise.resolve();
+    refresh.disabled = true;
+    loading = (async () => {
+      const connections = await toolHost.loadConnections(quiet ? () => {} : notify);
+      if (connections === null) return;
+      const previous = select.value;
+      select.replaceChildren(new Option('选择连接…', ''), ...connections.map(connection => {
+        const status = (connection.connected || connection.isConnected) ? '已连接' : '未连接';
+        const dialect = connection.dialect || connection.dbType || '';
+        const option = new Option(connection.name + ' (' + dialect + ' · ' + status + ')', connection.id);
+        option.dataset.dialect = dialect.toLowerCase();
+        return option;
+      }));
+      if (connections.some(connection => connection.id === previous)) select.value = previous;
+      loaded = true;
+      if (!quiet) notify('已读取 ' + connections.length + ' 个连接', 'ok');
+    })().finally(() => { loading = null; refresh.disabled = false; });
+    return loading;
   };
   const currentDialect = () => {
-    const option = select.options[select.selectedIndex];
-    const match = option ? /\b(mysql|postgres|sqlite|mssql|oracle)\b/i.exec(option.textContent) : null;
-    return match ? match[1].toLowerCase() : 'postgres';
+    const dialect = select.selectedOptions[0]?.dataset.dialect;
+    if (dialect === 'postgresql') return 'postgres';
+    if (dialect === 'sqlserver' || dialect === 'sql server') return 'mssql';
+    if (dialect === 'mariadb') return 'mysql';
+    return dialect || 'postgres';
   };
 
   const buildSql = () => {
-    const table = get('val-table').value.trim();
-    if (!table) throw new Error('请填写表名');
+    const dialect = currentDialect();
+    const table = quoteQualifiedIdent(dialect, get('val-table').value);
     const columns = get('val-columns').value.split(',').map((c) => c.trim()).filter(Boolean);
     if (!columns.length) throw new Error('请填写要校验的字段（逗号分隔）');
-    const dialect = currentDialect();
-    const maxLen = Number(get('val-max-len').value) || 255;
+    const maxLen = get('val-max-len').valueAsNumber;
+    if (get('val-len').checked && (!Number.isSafeInteger(maxLen) || maxLen < 0)) throw new Error('最大长度必须是非负整数');
     const enumValues = get('val-enum-values').value.split(',').map((v) => v.trim()).filter(Boolean);
+    if (get('val-enum').checked && !enumValues.length) throw new Error('请填写允许的枚举值');
     const statements = [];
-    for (const column of columns) {
+    for (const name of new Set(columns)) {
+      const column = quoteQualifiedIdent(dialect, name);
+      const add = (label, sql) => statements.push({ label: name + ' ' + label, sql });
       if (get('val-null').checked) {
-        statements.push('-- ' + column + ' 空值检查\nSELECT COUNT(*) AS null_count FROM ' + table + ' WHERE ' + column + ' IS NULL;');
+        add('空值检查', 'SELECT COUNT(*) AS null_count FROM ' + table + ' WHERE ' + column + ' IS NULL');
       }
       if (get('val-dup').checked) {
-        statements.push('-- ' + column + ' 重复值\nSELECT ' + column + ' AS value, COUNT(*) AS cnt FROM ' + table + ' GROUP BY ' + column + ' HAVING COUNT(*) > 1;');
+        add('重复值', 'SELECT ' + column + ' AS value, COUNT(*) AS cnt FROM ' + table + ' GROUP BY ' + column + ' HAVING COUNT(*) > 1');
       }
       if (get('val-len').checked) {
-        const lengthFn = dialect === 'mssql' ? 'LEN' : 'LENGTH';
-        statements.push('-- ' + column + ' 超长检查（>' + maxLen + '）\nSELECT COUNT(*) AS too_long FROM ' + table + ' WHERE ' + lengthFn + '(' + column + ') > ' + maxLen + ';');
+        const lengthFn = dialect === 'mssql' ? 'LEN' : dialect === 'mysql' ? 'CHAR_LENGTH' : 'LENGTH';
+        add('超长检查（>' + maxLen + '）', 'SELECT COUNT(*) AS too_long FROM ' + table + ' WHERE ' + lengthFn + '(' + column + ') > ' + maxLen);
       }
       if (get('val-enum').checked && enumValues.length) {
-        statements.push('-- ' + column + ' 枚举外值\nSELECT ' + column + ', COUNT(*) AS cnt FROM ' + table + ' WHERE ' + column + ' NOT IN (' + enumValues.map((v) => sqlString(v)).join(', ') + ') GROUP BY ' + column + ';');
+        add('枚举外值', 'SELECT ' + column + ', COUNT(*) AS cnt FROM ' + table + ' WHERE ' + column + ' NOT IN (' + enumValues.map(v => sqlString(v, dialect)).join(', ') + ') GROUP BY ' + column);
       }
     }
-    return statements.join('\n\n');
+    if (!statements.length) throw new Error('请至少选择一项校验规则');
+    output.value = statements.map(item => '-- ' + item.label.replace(/[\r\n]/g, ' ') + '\n' + item.sql + ';').join('\n\n');
+    copy.disabled = false;
+    return statements;
   };
 
-  get('val-generate')?.addEventListener('click', async () => {
-    try { await ensure(); output.value = buildSql(); notify('校验 SQL 已生成', 'ok'); }
+  const invalidate = () => {
+    activeRun++;
+    run.disabled = false;
+    output.value = '';
+    copy.disabled = true;
+    results.textContent = '校验条件已更改，请重新执行';
+  };
+  const sharedFields = ['val-null', 'val-dup', 'val-len', 'val-enum', 'val-enum-values', 'val-max-len'];
+  for (const id of ['val-connection', 'val-table', 'val-columns', ...sharedFields]) get(id).addEventListener('input', invalidate);
+  refresh.addEventListener('click', () => { void ensure(true); });
+  void ensure(false, true);
+  copy.disabled = true;
+  get('val-generate').addEventListener('click', () => {
+    output.value = '';
+    copy.disabled = true;
+    try { buildSql(); notify('校验 SQL 已生成', 'ok'); }
     catch (error) { notify('生成失败：' + error.message, 'error'); }
   });
-  get('val-copy')?.addEventListener('click', () => toolHost.copyText(output.value, notify));
-  get('val-run')?.addEventListener('click', async () => {
+  copy.addEventListener('click', () => { if (output.value) void toolHost.copyText(output.value, notify); });
+  run.addEventListener('click', async () => {
+    const request = ++activeRun;
+    const connectionId = select.value;
+    if (!connectionId) { notify('请选择连接，可先点击刷新连接', 'error'); return; }
+    run.disabled = true;
+    results.textContent = '';
     try {
-      await ensure();
-      const connectionId = select.value;
-      if (!connectionId) { notify('请选择连接', 'error'); return; }
-      const sqlText = buildSql();
-      output.value = sqlText;
-      const statements = sqlText.split(/;\s*\n/).map((part) => part.replace(/^--.*$/gm, '').trim()).filter(Boolean).map((part) => part + ';');
-      const host = get('val-result');
-      host.innerHTML = '';
+      const statements = buildSql();
       let index = 0;
-      for (const statement of statements) {
+      for (const { label, sql } of statements) {
         index += 1;
-        const result = await toolHost.queryData(connectionId, statement);
-        const html = '<div class="tool-head" style="height:auto;padding:6px 8px">第 ' + index + ' 条 · ' + result.rows.length + ' 行 · ' + (result.elapsedMs || 0) + ' ms</div>' +
+        const result = await toolHost.queryData(connectionId, sql);
+        if (request !== activeRun) return;
+        const html = '<div class="tool-head" style="height:auto;padding:6px 8px">第 ' + index + ' 条 · ' +
+          escapeHtml(label) + ' · ' + result.rows.length + ' 行 · ' + escapeHtml(result.elapsedMs || 0) + ' ms</div>' +
           '<table class="jgrid objarray" style="width:max-content;min-width:100%"><thead><tr>' +
           result.columns.map((column) => '<th>' + escapeHtml(column.name) + '</th>').join('') + '</tr></thead><tbody>' +
           result.rows.map((row) => '<tr>' + row.map((value) => '<td class="val">' + escapeHtml(value === null ? '' : String(value)) + '</td>').join('') + '</tr>').join('') +
           '</tbody></table>';
-        host.insertAdjacentHTML('beforeend', html);
+        results.insertAdjacentHTML('beforeend', html);
       }
       notify('校验执行完成，共 ' + statements.length + ' 条', 'ok');
     } catch (error) {
-      notify('执行失败：' + (error && error.message ? error.message : error), 'error');
+      if (request === activeRun) notify('执行失败：' + error.message, 'error');
+    } finally {
+      if (request === activeRun) run.disabled = false;
     }
   });
 }
@@ -92,16 +133,25 @@ function initOfflineValidation(panel, notify, saveFile) {
   const host = get('val-offline-result');
   if (!source || !host) return;
   let issues = [];
+  const exportButton = get('val-offline-export');
+  function clearResults() {
+    issues = [];
+    exportButton.disabled = true;
+    host.textContent = '输入或规则已更改，请重新校验';
+  }
+  for (const id of ['val-source', 'val-regex', 'val-rule-fields', 'val-null', 'val-dup', 'val-len',
+    'val-enum', 'val-enum-values', 'val-dup-columns', 'val-max-len']) get(id).addEventListener('input', clearResults);
+  exportButton.disabled = true;
 
   const rowsFromText = (text) => {
     const trimmed = String(text || '').trim();
     if (!trimmed) throw new Error('请先粘贴 INSERT / CSV / JSON 数据');
-    if (/^insert\s+into/i.test(trimmed)) return parseInsertSql(trimmed);
+    if (/^(?:--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|\s)*insert\s+into\b/i.test(trimmed)) return parseInsertSql(trimmed);
     return dataRowsFromText(trimmed);
   };
 
   const run = () => {
-    issues = [];
+    clearResults();
     try {
       const parsed = rowsFromText(source.value);
       const columns = parsed.columns;
@@ -161,6 +211,7 @@ function initOfflineValidation(panel, notify, saveFile) {
               '</td><td class="val">' + escapeHtml(issue.message) + '</td></tr>').join('') + '</tbody></table>'
           : '<div class="tool-empty">没有发现问题</div>');
       notify(summary, issues.length ? 'info' : 'ok');
+      exportButton.disabled = !issues.length;
     } catch (error) {
       host.textContent = '校验失败：' + error.message;
       notify(host.textContent, 'error');
@@ -168,7 +219,7 @@ function initOfflineValidation(panel, notify, saveFile) {
   };
 
   get('val-offline-run')?.addEventListener('click', run);
-  get('val-offline-export')?.addEventListener('click', async () => {
+  exportButton.addEventListener('click', async () => {
     if (!issues.length) { notify('没有可导出的问题', 'error'); return; }
     const header = '行号,字段,规则,值,说明\r\n';
     const body = issues.map((issue) => [issue.row, issue.column, issue.rule, issue.value, issue.message]

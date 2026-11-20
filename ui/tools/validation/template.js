@@ -1,9 +1,10 @@
 export default `
 <div class="tool-head"><span>数据验证排查</span><span class="hint">生成只读校验 SQL，可直接在 DBX 执行</span></div>
 <div class="tool-actions">
-  <select id="val-connection"></select>
+  <select id="val-connection" aria-label="数据库连接"><option value="">选择连接…</option></select>
+  <button id="val-refresh" type="button">刷新连接</button>
   <input id="val-table" placeholder="表名，如 public.orders" />
-  <input id="val-columns" placeholder="字段（逗号分隔），留空表示全部" />
+  <input id="val-columns" placeholder="要校验的字段（逗号分隔）" />
   <button id="val-generate" type="button">生成校验 SQL</button>
   <button id="val-run" type="button">执行校验</button>
   <button id="val-copy" type="button">复制 SQL</button>
